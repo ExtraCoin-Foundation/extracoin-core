@@ -1,1 +1,1 @@
-# extracoin-libs
+# extrachain-core
