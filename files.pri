@@ -10,7 +10,6 @@ SOURCES += \
     $$PWD/dfs/packages/sources/message_struct.cpp \
     $$PWD/dfs/packages/sources/req_frags_message.cpp \
     $$PWD/dfs/packages/sources/title_message.cpp \
-    $$PWD/dfs/packages/sources/ui_messages.cpp \
     $$PWD/dfs/types/sources/cardfile.cpp \
     $$PWD/sources/managers/chat.cpp \
     $$PWD/sources/managers/chatmanager.cpp \
@@ -97,8 +96,6 @@ HEADERS += \
     $$PWD/headers/managers/notification_manager.h \
     $$PWD/headers/metatypes.h \
     $$PWD/dfs/packages/headers/dfs_request.h \
-    $$PWD/dfs/packages/headers/ui_messages.h \
-    $$PWD/dfs/packages/headers/ui_messages.h \
     $$PWD/headers/datastorage/index/actorindex.h \
     $$PWD/headers/datastorage/index/blockindex.h \
     $$PWD/headers/datastorage/index/memindex.h \

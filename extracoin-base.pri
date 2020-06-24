@@ -2,7 +2,7 @@ contains(DEFINES, EXTRACOIN_CONSOLE) {
     QT -= gui 
 }
 
-TARGET = extracoin
+TARGET = extracoin-core
 VERSION = 0.7.12
 
 include(settings.pri)
