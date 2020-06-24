@@ -1,6 +1,8 @@
 #include <QString>
 #include <QFile>
 
+#include <optional>
+
 #include "dfs/types/headers/dfstruct.h"
 #include "utils/db_connector.h"
 #include "dfs/managers/headers/card_manager.h"
@@ -18,7 +20,7 @@ public:
 
     std::optional<DBRow> last();
 
-    bool append(QString fileId, int type, QByteArray sign, bool isFilePath = false, int key = -1);
+    bool append(QString fileId, int type, int version, QByteArray sign, bool isFilePath = false, int key = 1);
     bool updateLastCache();
     std::vector<DBRow> select(int count, int offset);
 

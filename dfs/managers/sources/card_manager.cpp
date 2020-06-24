@@ -3,7 +3,7 @@
 #include <QUrl>
 
 std::vector<std::string> CardManager::getFilesByType(const std::string &userId, DfsStruct::Type type)
-{
+{ // ignore "."?
     DBConnector dbConnect;
 
     if (!QFile::exists(pathToRoot(userId).c_str()))
@@ -21,7 +21,7 @@ std::vector<std::string> CardManager::getFilesByType(const std::string &userId, 
     std::vector<std::string> listData;
 
     for (DBRow &temp : data)
-        listData.push_back(CardManager::buildPathForFile(userId, temp["id"], type, false));
+        listData.push_back(CardManager::buildPathForFile(userId, temp["id"], type));
 
     return listData;
 }
@@ -54,7 +54,7 @@ QStringList CardManager::getAllFiles(const QByteArray &userId)
     for (DBRow &temp : data)
     {
         std::string path = CardManager::buildPathForFile(userId.toStdString(), temp["id"],
-                                                         DfsStruct::Type(std::stoi(temp["type"])), false);
+                                                         DfsStruct::Type(std::stoi(temp["type"])));
         listData.append(QByteArray::fromStdString(path));
     }
 
@@ -63,15 +63,15 @@ QStringList CardManager::getAllFiles(const QByteArray &userId)
 
 DfsStruct::Type CardManager::getTypeByName(const QString &fullPath)
 {
-    QString userId = fullPath.mid(5, 20);
+    QString userId = fullPath.mid(DfsStruct::ROOT_FOOLDER_NAME_MID, 20);
     bool hasSection = false;
     // int fromType = fullPath.indexOf("/", 26);
-    int from = fullPath.indexOf("/", 27) + 1;
+    int from = fullPath.indexOf("/", 20 + DfsStruct::ROOT_FOOLDER_NAME_MID + 2) + 1;
     // int fromSection = fullPath.indexOf("/", from) + 1;
     hasSection = fullPath[from + 2] == "/";
     // qDebug() << fullPath << fullPath[from + 2] << hasSection << fullPath.mid(hasSection ? fromSection :
     // from);
-    QString type = fullPath.mid(26);
+    QString type = fullPath.mid(20 + DfsStruct::ROOT_FOOLDER_NAME_MID + 1);
     type = type.left(type.indexOf("/"));
     // qDebug() << type;
 
@@ -101,20 +101,28 @@ std::vector<std::string> CardManager::getAll(DfsStruct::Type type)
 }
 
 std::string CardManager::buildPathForFile(const std::string &userId, const std::string &file,
-                                          DfsStruct::Type type, bool localFormat)
+                                          DfsStruct::Type type, PathStyle pathFormat)
 {
     if (file.empty())
         return "";
 
     const std::string currentPath =
-        (localFormat ? QUrl::fromLocalFile(QDir::currentPath()).toString().toStdString() + "/" : "")
+        (pathFormat == PathStyle::FullLocal
+             ? QUrl::fromLocalFile(QDir::currentPath()).toString().toStdString() + "/"
+             : "")
         + DfsStruct::ROOT_FOOLDER_NAME.toStdString() + "/" + userId;
-    std::string section = QByteArray::fromStdString(file).right(2).toStdString() + "/";
+
+    QString fileStr = QString::fromStdString(file);
+    std::string section = fileStr.contains(".")
+        ? fileStr.mid(fileStr.indexOf(".") - 2, 2).toStdString() + "/"
+        : QByteArray::fromStdString(file).right(2).toStdString() + "/";
+
     if (int(type) > 100)
     {
         type = DfsStruct::Type(static_cast<int>(type) - 100);
         section = "";
     }
+
     std::string typeName = DfsStruct::toString(type).toStdString();
     std::string path = currentPath + "/" + typeName + "/" + section + file;
 
@@ -123,21 +131,19 @@ std::string CardManager::buildPathForFile(const std::string &userId, const std::
 
 std::vector<std::string> CardManager::buildPathForFiles(const std::string &userId,
                                                         const std::vector<std::string> &files,
-                                                        DfsStruct::Type type, bool localFormat)
+                                                        DfsStruct::Type type, PathStyle pathFormat)
 {
     std::vector<std::string> result;
 
     for (const std::string &file : files)
-    {
-        result.push_back(buildPathForFile(userId, file, type, localFormat));
-    }
+        result.push_back(buildPathForFile(userId, file, type, pathFormat));
 
     return result;
 }
 
 QString CardManager::cutPath(QString fullPath)
 {
-    QString userId = fullPath.mid(5, 20);
+    QString userId = fullPath.mid(DfsStruct::ROOT_FOOLDER_NAME_MID, 20);
     bool hasSection = false;
     // int fromType = fullPath.indexOf("/", 26);
     int from = fullPath.indexOf("/", 27) + 1;
@@ -145,11 +151,77 @@ QString CardManager::cutPath(QString fullPath)
     hasSection = fullPath[from + 2] == "/";
     // qDebug() << fullPath << fullPath[from + 2] << hasSection << fullPath.mid(hasSection ? fromSection :
     // from);
-    QString type = fullPath.mid(26);
+    QString type = fullPath.mid(20 + DfsStruct::ROOT_FOOLDER_NAME_MID + 1);
     type = type.left(type.indexOf("/"));
     // qDebug() << type;
 
+    if (fullPath.contains(".comments") || fullPath.contains(".likes"))
+    {
+        hasSection = false;
+    }
+
     return fullPath.mid(hasSection ? fromSection : from);
+}
+
+int CardManager::dfsVersion(QString path)
+{
+    using namespace DfsStruct;
+    QString name = cutPath(path);
+    DfsStruct::Type type = getTypeByName(path);
+
+    switch (type)
+    {
+    case DfsStruct::Type::Post:
+        if (name.contains(".comments"))
+            return dfsVersions[DfsVersionType::PostCommentsVersion];
+        else if (name.contains(".likes"))
+            return dfsVersions[DfsVersionType::PostLikesVersion];
+        else
+            return dfsVersions[DfsVersionType::PostVersion];
+        break;
+    case DfsStruct::Type::Event:
+        if (name.contains(".comments"))
+            return dfsVersions[DfsVersionType::EventCommentsVersion];
+        else if (name.contains(".likes"))
+            return dfsVersions[DfsVersionType::EventLikesVersion];
+        else if (name.contains(".users"))
+            return dfsVersions[DfsVersionType::EventUsersVersion];
+        else
+            return dfsVersions[DfsVersionType::EventVersion];
+        break;
+    case DfsStruct::Type::Private:
+        if (name == "chats")
+            return dfsVersions[DfsVersionType::PrivateChats];
+        else if (name == "events")
+            return dfsVersions[DfsVersionType::PrivateEvents];
+        else if (name == "likes")
+            return dfsVersions[DfsVersionType::PrivateLikes];
+        else if (name == "notifications")
+            return dfsVersions[DfsVersionType::PrivateNotifications];
+        else if (name == "saved")
+            return dfsVersions[DfsVersionType::PrivateSaved];
+        break;
+    case DfsStruct::Type::Service:
+        if (name == "chatinvite")
+            return dfsVersions[DfsVersionType::ServiceChatInvite];
+        else if (name == "events")
+            return dfsVersions[DfsVersionType::ServiceEvents];
+        else if (name == "follower")
+            return dfsVersions[DfsVersionType::ServiceFollower];
+        else if (name == "subscribe")
+            return dfsVersions[DfsVersionType::ServiceSubscribe];
+        break;
+    case DfsStruct::Type::Chat:
+        if (name.contains("/msg"))
+            return dfsVersions[DfsVersionType::ChatMsg];
+        else if (name.contains("/users"))
+            return dfsVersions[DfsVersionType::ChatUsers];
+        break;
+    default:
+        return 0;
+    }
+
+    return 0;
 }
 
 CardManager::CardManager()

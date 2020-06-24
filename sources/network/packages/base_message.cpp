@@ -8,13 +8,13 @@ void BaseMessage::setMsgData(const QByteArray &data)
 
 void BaseMessage::calcDigSig(const Actor<KeyPrivate> &actor)
 {
-    signer = actor.getId();
-    digSig = actor.getKey()->sign(concatenateAllData());
+    signer = actor.id();
+    digSig = actor.key()->sign(concatenateAllData());
 }
 
 bool BaseMessage::verifyDigSig(const Actor<KeyPublic> &actor) const
 {
-    return actor.getKey()->verify(concatenateAllData(), digSig);
+    return actor.key()->verify(concatenateAllData(), digSig);
 }
 
 void BaseMessage::operator=(BaseMessage b)
@@ -85,7 +85,7 @@ short BaseMessage::getFieldsCount() const
 QByteArray BaseMessage::serialize() const
 {
     //    QByteArray serialized = "";
-    return Serialization::universalSerialize(serializedParams(), Messages::FIELD_SIZE);
+    return Serialization::serialize(serializedParams(), Messages::FIELD_SIZE);
     //    for (const QByteArray &param : serializedParams())
     //    {
 
@@ -104,15 +104,15 @@ void BaseMessage::deserialize(const QByteArray &serialized)
     {
         int count = Utils::qByteArrayToInt(serialized.mid(pos, Messages::FIELD_SIZE));
         pos += Messages::FIELD_SIZE;
-        QByteArray el = serialized.mid(pos, count);
+        //        QByteArray el =
+        list << serialized.mid(pos, count);
         pos += count;
-        list << el;
     }
     if (list.size() < getFieldsCount())
     {
         qDebug() << "Error: can't deserialize message:" << serialized;
     }
-    //    QList<QByteArray> l = Serialization::universalDeserialize(serialized);
+    // QList<QByteArray> l = Serialization::deserialize(serialized);
     operator=(list);
 }
 

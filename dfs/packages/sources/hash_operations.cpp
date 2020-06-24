@@ -32,12 +32,12 @@ short DistFileSystem::requestLast::getFieldsCount() const
 
 QByteArray DistFileSystem::requestLast::serialize() const
 {
-    return Serialization::universalSerialize(serializedParams(), 8);
+    return Serialization::serialize(serializedParams(), 8);
 }
 
 void DistFileSystem::requestLast::deserialize(const QByteArray &serialized)
 {
-    QList<QByteArray> l = Serialization::universalDeserialize(serialized, 8);
+    QList<QByteArray> l = Serialization::deserialize(serialized, 8);
     operator=(l);
 }
 
@@ -75,12 +75,12 @@ short DistFileSystem::responseLast::getFieldsCount() const
 
 QByteArray DistFileSystem::responseLast::serialize() const
 {
-    return Serialization::universalSerialize(serializedParams(), 8);
+    return Serialization::serialize(serializedParams(), 8);
 }
 
 void DistFileSystem::responseLast::deserialize(const QByteArray &serialized)
 {
-    QList<QByteArray> l = Serialization::universalDeserialize(serialized, 8);
+    QList<QByteArray> l = Serialization::deserialize(serialized, 8);
     operator=(l);
 }
 
@@ -90,7 +90,7 @@ const QList<QByteArray> DistFileSystem::CardFileChange::serializedParams() const
 {
     QList<QByteArray> list;
     list << QByteArray::number(key) << actorId << fileId << prevId << nextId << QByteArray::number(type)
-         << sign;
+         << QByteArray::number(version) << sign;
     return list;
 }
 
@@ -104,6 +104,7 @@ void DistFileSystem::CardFileChange::operator=(QList<QByteArray> &list)
         prevId = list.takeFirst();
         nextId = list.takeFirst();
         type = list.takeFirst().toInt();
+        version = list.takeFirst().toInt();
         sign = list.takeFirst();
     }
     else
@@ -120,7 +121,7 @@ void DistFileSystem::CardFileChange::operator=(QByteArray &serialized)
 bool DistFileSystem::CardFileChange::isEmpty() const
 {
     return key == -1 || actorId.isEmpty() || fileId.isEmpty() || prevId.isEmpty() || nextId.isEmpty()
-        || type == -1 || sign.isEmpty();
+        || type == -1 || version == -1 || sign.isEmpty();
 }
 
 short DistFileSystem::CardFileChange::getFieldsCount() const
@@ -130,12 +131,12 @@ short DistFileSystem::CardFileChange::getFieldsCount() const
 
 QByteArray DistFileSystem::CardFileChange::serialize() const
 {
-    return Serialization::universalSerialize(serializedParams(), 4);
+    return Serialization::serialize(serializedParams(), 4);
 }
 
 void DistFileSystem::CardFileChange::deserialize(const QByteArray &serialized)
 {
-    QList<QByteArray> l = Serialization::universalDeserialize(serialized, 4);
+    QList<QByteArray> l = Serialization::deserialize(serialized, 4);
     if (l.length() < FIELDS_COUNT)
     {
         qDebug() << "CardFileChange error";
@@ -179,12 +180,12 @@ short DistFileSystem::RequestCardPart::getFieldsCount() const
 
 QByteArray DistFileSystem::RequestCardPart::serialize() const
 {
-    return Serialization::universalSerialize(serializedParams(), 8);
+    return Serialization::serialize(serializedParams(), 8);
 }
 
 void DistFileSystem::RequestCardPart::deserialize(const QByteArray &serialized)
 {
-    QList<QByteArray> l = Serialization::universalDeserialize(serialized, 8);
+    QList<QByteArray> l = Serialization::deserialize(serialized, 8);
     operator=(l);
 }
 
@@ -225,11 +226,11 @@ short DistFileSystem::ResponseCardPart::getFieldsCount() const
 
 QByteArray DistFileSystem::ResponseCardPart::serialize() const
 {
-    return Serialization::universalSerialize(serializedParams(), 8);
+    return Serialization::serialize(serializedParams(), 8);
 }
 
 void DistFileSystem::ResponseCardPart::deserialize(const QByteArray &serialized)
 {
-    QList<QByteArray> l = Serialization::universalDeserialize(serialized, 8);
+    QList<QByteArray> l = Serialization::deserialize(serialized, 8);
     operator=(l);
 }

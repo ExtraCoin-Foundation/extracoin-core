@@ -10,13 +10,12 @@
 #include <QRandomGenerator>
 #include <QDebug>
 
-#include <iostream>
-//#include "utils/utils.h"
-
 #include "gmpxx.h"
 
 #ifdef QT_DEBUG
-#define UPDATE_DEBUG() qdata = m_data.get_str(16).c_str();
+#define UPDATE_DEBUG()                  \
+    qdata = m_data.get_str(16).c_str(); \
+    qdataDec = m_data.get_str(10).c_str();
 #else
 #define UPDATE_DEBUG()
 #endif
@@ -46,6 +45,7 @@ private:
 
 #ifdef QT_DEBUG
     QByteArray qdata;
+    QByteArray qdataDec;
 #endif
 
 public:
@@ -56,7 +56,7 @@ public:
     BigNumber operator+(long long);
     BigNumber operator-(const BigNumber &);
     BigNumber operator-(long long);
-    BigNumber operator*(const BigNumber &)const;
+    BigNumber operator*(const BigNumber &) const;
     BigNumber operator*(long long);
     BigNumber operator/(const BigNumber &);
     BigNumber operator/(long long);
@@ -86,12 +86,14 @@ public:
     bool isEmpty() const;
     QByteArray toByteArray(int base = 16) const;
     std::string toStdString(int base = 16) const;
+    QByteArray toZeroByteArray(int size) const;
     QByteArray toActorId() const;
     BigNumber pow(unsigned long number);
     BigNumber sqrt(unsigned long number = 2) const;
     BigNumber abs() const;
     bool getInfinity() const;
     void setInfinity(bool value);
+    BigNumber nextPrime();
 
     static bool isValid(const QByteArray &bigNumber, int base = 16);
     static BigNumber factorial(unsigned long number);

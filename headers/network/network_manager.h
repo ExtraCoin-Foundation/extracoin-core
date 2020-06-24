@@ -74,10 +74,10 @@ private:
     UPNPConnection *upnpDis;
     UPNPConnection *upnpNet;
     QList<QByteArray> tempConnections;
-#ifdef EXTRACOIN_CONSOLE
+#ifdef EXTRACHAIN_CONSOLE
     const int SIZE_OF_CONNECTIONS = 100;
 #endif
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     const int SIZE_OF_CONNECTIONS = 5;
 #endif
 protected:
@@ -113,7 +113,7 @@ public:
     void resolverMessage(const QHostAddress &from, const QString &message);
     QList<SocketService *> connections;
 
-    quint16 serverPort = isDebug ? 2221 : 2222;
+    quint16 serverPort = isDebug ? 2222 : 2222;
 
 private:
     void connectSocket();
@@ -168,7 +168,8 @@ protected:
      */
     bool checkMsgCount(const QByteArray &msg, QMap<QByteArray, int> &handler,
                        const QList<SocketService *> list);
-    void saveToCache(const QByteArray &message, const unsigned int &msgType, const SocketPair &receiver);
+    void saveToCache(const QByteArray &message, const unsigned int &msgType, const SocketPair &receiver,
+                     Config::Net::TypeSend typeSend);
     void sendFromCache();
 private slots:
     /**
@@ -225,8 +226,13 @@ public slots:
     void removeConnection();
 
 public:
+    void send(const QByteArray &message, const unsigned int &msgType,
+              const SocketPair &receiver = SocketPair(),
+              Config::Net::TypeSend typeSend = Config::Net::TypeSend::Default);
+
     virtual void sendMessage(const QByteArray &message, const unsigned int &msgType,
-                             const SocketPair &receiver);
+                             const SocketPair &receiver = {},
+                             Config::Net::TypeSend typeSend = Config::Net::TypeSend::Default);
     void distMessage(const QByteArray &data, const SocketPair &socketData);
     virtual void *MessageReceived(const QByteArray &msg, const SocketPair &receiver);
 
@@ -251,6 +257,7 @@ signals:
     void qmlNetworkStatus(bool status);
     void qmlNetworkSockets(int socketsCount);
     void qmlServerError(bool serverError);
+    void localIpFounded(QString localIp);
     void buildError();
 };
 

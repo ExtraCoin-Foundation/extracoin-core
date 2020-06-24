@@ -8,17 +8,15 @@
 #include "datastorage/index/blockindex.h"
 #include "datastorage/index/memindex.h"
 #include "datastorage/transaction.h"
-#include "datastorage/tx_pair.h"
 #include "managers/account_controller.h"
 #include "utils/bignumber.h"
-#include "utils/list_container.h"
 #include <QByteArray>
 #include <QHostAddress>
 #include <QObject>
 #include <QString>
 #include <QMutex>
 #include <QTemporaryFile>
-
+#include <cassert>
 // database
 #include "headers/utils/db_connector.h"
 class TransactionManager;
@@ -55,30 +53,25 @@ private:
 
 public:
     Blockchain(AccountController *accountController, bool fileMode = true);
+    Block getBlockByHash(const QByteArray &hash);
     ~Blockchain();
 
 private:
-    //    template <typename T>
-    Block getBlockByIndex(const BigNumber &index)
-    {
-        Block block = fileMode ? blockIndex.getBlockById(index) : memIndex[index];
-        Block block2 = validateAndReturnBlock(block);
-        return block2;
-    }
+    Block getBlockByIndex(const BigNumber &index);
     Block getBlockByApprover(const BigNumber &approver);
     Block getBlockByData(const QByteArray &data);
-    Block getBlockByHash(const QByteArray &hash);
 
     QByteArray getBlockDataByIndex(const BigNumber &index);
 
-    Transaction getTxByHash(const QByteArray &hash, const QByteArray &token = "0");
-    Transaction getTxBySender(const BigNumber &id, const QByteArray &token = "0");
-    Transaction getTxByReceiver(const BigNumber &id, const QByteArray &token = "0");
-    Transaction getTxBySenderOrReceiver(const BigNumber &id, const QByteArray &token = "0");
-    Transaction getTxBySenderOrReceiverAndToken(const BigNumber &id, const QByteArray &token = "0");
-    Transaction getTxByApprover(const BigNumber &id, const QByteArray &token = "0");
-    Transaction getTxByUser(const BigNumber &id, const QByteArray &token = "0");
-    TxPair getTxPair(const BigNumber &first, const BigNumber second);
+    std::pair<Transaction, QByteArray> getTxByHash(const QByteArray &hash, const QByteArray &token = "0");
+    std::pair<Transaction, QByteArray> getTxBySender(const BigNumber &id, const QByteArray &token = "0");
+    std::pair<Transaction, QByteArray> getTxByReceiver(const BigNumber &id, const QByteArray &token = "0");
+    std::pair<Transaction, QByteArray> getTxBySenderOrReceiver(const BigNumber &id,
+                                                               const QByteArray &token = "0");
+    std::pair<Transaction, QByteArray> getTxBySenderOrReceiverAndToken(const BigNumber &id,
+                                                                       const QByteArray &token = "0");
+    std::pair<Transaction, QByteArray> getTxByApprover(const BigNumber &id, const QByteArray &token = "0");
+    std::pair<Transaction, QByteArray> getTxByUser(const BigNumber &id, const QByteArray &token = "0");
 
     void saveTxInfoInEC(const QByteArray data) const;
 
@@ -88,6 +81,14 @@ private:
     void addRecordsIfNew(const GenesisDataRow &row1, const GenesisDataRow &row2);
     QByteArray findRecordsInBlock(const Block &block);
     bool signCheckAdd(Block &block);
+    void sendFeeUnfreeze(Block &block);
+    void sendUnFee(Block &block);
+    QMap<QByteArray, BigNumber> getInvestmentsStaking(const BigNumber &wallet, const BigNumber &token);
+
+    const int COUNT_APPROVER_BLOCK = 1;
+    const int COUNT_CHECKER_BLOCK = 2;
+    const int COUNT_UNFROZE_FEE = 3;
+    const BigNumber StakingCoef = 5;
 
 public:
     GenesisBlock createGenesisBlock(const Actor<KeyPrivate> actor,
@@ -99,6 +100,7 @@ public:
     BigNumber getSupply(const QByteArray &idToken);
     BigNumber getFullSupply(const QByteArray &idToken);
 
+    bool checkHaveUNFreezeTx(const Transaction *tx, const BigNumber &indexBlock); // return true if haven`t
 private:
     void addGenesisBlockFromTempFile(const QByteArray &prevGenesisHash);
     Block checkBlock(const Block &block);
@@ -118,6 +120,11 @@ private:
      * @return block - if it is valid, empty block - if block is corrupted.
      */
     Block validateAndReturnBlock(const Block &block);
+    void stakingReward(const Block &block);
+
+    std::pair<BigNumber, BigNumber> getLastTxForStaking(const BigNumber &receiver, const BigNumber &token);
+
+    bool checkStakingReward(const QByteArray &hash, const BigNumber &token, const BigNumber receiver);
 
 public:
     /**
@@ -153,7 +160,8 @@ public:
      * @param type of param
      * @return transaction
      */
-    Transaction getTransaction(SearchEnum::TxParam type, const QByteArray &value);
+    std::pair<Transaction, QByteArray> getTransaction(SearchEnum::TxParam type, const QByteArray &value,
+                                                      const QByteArray &token = "0");
 
     /**
      * Add block to blockchain
@@ -193,12 +201,6 @@ public:
 
     // - ACTORS - //
 
-    /**
-     * Add actor to actor index
-     * @param actor - serialized actor
-     * @return 0 is success, or error code
-     */
-    int addActor(const Actor<KeyPublic> &actor);
     /**
      * Gets actor from actor index
      * @param actorId
@@ -258,7 +260,10 @@ public:
      */
     BigNumber getRecords() const;
 
-    BigNumber getUserBalance(BigNumber userId, BigNumber tokenId = BigNumber("0")) const;
+    BigNumber getUserBalance(BigNumber userId, BigNumber tokenId) const;
+    BigNumber getFreezeUserBalance(BigNumber userId, BigNumber tokenId, BigNumber sender = -1) const;
+
+    QMap<QByteArray, BigNumber> getAllStakingForMe(BigNumber userId, BigNumber tokenId) const;
     /**
      * @brief Show blockchain
      */
@@ -269,7 +274,7 @@ public:
     void getSmContractMembers(const Block &block) const;
 signals:
 
-    void newNotify(const notification ntf);
+    void newNotify(const Notification ntf);
     void addActorInActorIndex(Actor<KeyPublic> actor);
     void updateTransactionListInModel(QByteArray, QByteArray);
     /**
@@ -351,6 +356,6 @@ public slots:
     /**
      * @brief finds needed transaction by sender or receiver
      */
-    void proveTx();
+    void proveTx(Transaction *tx);
 };
 #endif // BLOCKCHAIN_H

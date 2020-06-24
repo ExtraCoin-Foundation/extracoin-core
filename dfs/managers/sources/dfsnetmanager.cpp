@@ -25,7 +25,7 @@ QList<DFSResolverService *> DFSNetManager::getDfsResolvers() const
 DFSNetManager::DFSNetManager(AccountController *accountList, ActorIndex *actInd)
     : NetManager(accountList, actInd)
 {
-    serverPort = isDebug ? 2224 : 2225;
+    serverPort = isDebug ? 2225 : 2225;
 }
 
 DFSNetManager::~DFSNetManager()
@@ -70,6 +70,7 @@ void DFSNetManager::createDFSResolver(Network::DataStruct ds)
     resolver->setDfs(dfs);
     resolver->setActorIndex(actorIndex);
     resolver->setTask(ds.msg, ds.receiver);
+    resolver->setLongReceiver(ds.receiver);
     dfsResolvers.append(resolver);
     connectResolver(dfsResolvers.last());
     ThreadPool::addThread(dfsResolvers.last());
@@ -101,18 +102,6 @@ void DFSNetManager::appendSocket(SocketService *socket)
 {
     connections.append(socket);
     socketConnection();
-}
-
-void DFSNetManager::send(const QByteArray &data, const unsigned int &msgType, const SocketPair &receiver)
-{
-    Messages::BaseMessage msg;
-    //    msg.setMsgData(data);
-    msg.type = msgType;
-    msg.data = data;
-    QByteArray message = msg.serialize();
-    sendMessage(message, msgType, receiver);
-    //    std::for_each(connections.begin(), connections.end(),
-    //                  [&message, &receiver](SocketService *socket) { socket->distMsg(message, receiver); });
 }
 
 void DFSNetManager::process()
@@ -151,26 +140,45 @@ void DFSNetManager::titleArrived(Network::DataStruct ds)
     }
 }
 
-void DFSNetManager::removeResolver()
+void DFSNetManager::removeResolver(DFSResolverService::FinishStatus status)
 {
     DFSResolverService *resolver = qobject_cast<DFSResolverService *>(QObject::sender());
+
     if (resolver == nullptr)
     {
         qDebug() << "WAT";
         return;
     }
+
+    QString filePath = resolver->getTitle().filePath;
+    auto pair = resolver->getLongReceiver();
     disconnectResolver(resolver);
+
     if (resolver->getType() == Resolver::Type::DFS)
     {
         dfsResolvers.removeOne(resolver);
     }
+
     if (resolver != nullptr)
         emit resolver->finished();
+
     if (titleVector.size() > 0)
     {
         Network::DataStruct ds = titleVector.front();
         titleVector.pop();
         createDFSResolver(ds);
+    }
+
+    switch (status)
+    {
+    case DFSResolverService::FinishStatus::FileReset:
+        dfs->requestFile(filePath);
+        break;
+    case DFSResolverService::FinishStatus::FileFinished:
+        dfs->reportFileCompleted(filePath, pair);
+        break;
+    case DFSResolverService::FinishStatus::FileExists:
+        break;
     }
 }
 
@@ -245,7 +253,8 @@ SocketService *DFSNetManager::addConnectionFromPair(QHostAddress address, quint1
     connections.append(socket);
     connections.last()->setNetManager(this);
     socketConnection();
-    qDebug() << "NET MANAGER: New connection is established : " << address << ":" << port;
+    qDebug().noquote().nospace() << "DFS NET MANAGER: New connection is established: " << address.toString()
+                                 << ":" << port;
 
     ThreadPool::addThread(connections.last());
     QTimer::singleShot(3000, this, SLOT(checkConnectionsStatus()));

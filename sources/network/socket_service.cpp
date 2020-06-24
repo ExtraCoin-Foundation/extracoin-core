@@ -107,7 +107,7 @@ SocketService::SocketService(qintptr socketDescriptor, QObject *parent)
 {
     this->socketDescriptor = socketDescriptor;
     //    dpBuffer->clear();
-    qDebug() << "Socket Descriptor" << socketDescriptor;
+    qDebug() << "[Socket Service] Socket Descriptor" << socketDescriptor;
 }
 
 SocketService::~SocketService()
@@ -116,7 +116,7 @@ SocketService::~SocketService()
         return;
     socket->close();
     socket->deleteLater();
-    qDebug() << "---------> Remove SocketService" << address << port;
+    qDebug() << "[Socket Service] Remove SocketService" << address << port;
 }
 
 void SocketService::sendMsg(const QByteArray &data, const SocketPair &socketData)
@@ -139,7 +139,7 @@ void SocketService::sendMsg(const QByteArray &data, const SocketPair &socketData
     //    0)))
     //    {
 
-    QByteArray _wtSok = Serialization::universalSerialize({ data }, Messages::FIELD_SIZE);
+    QByteArray _wtSok = Serialization::serialize({ data }, Messages::FIELD_SIZE);
     socket->write(_wtSok, _wtSok.size());
     //    }
 }
@@ -170,8 +170,8 @@ void SocketService::process()
         connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error), this,
                 [this](QAbstractSocket::SocketError socketError) {
                     Q_UNUSED(socketError)
-                    qDebug().nospace().noquote()
-                        << "Socket error " << socketError << " for " << address << ":" << port;
+                    qDebug().nospace().noquote() << "[Socket Service] Socket error " << socketError << " for "
+                                                 << address << ":" << port;
                     if (this->socket->state() != QTcpSocket::ConnectedState)
                         this->reconnect();
                 });
@@ -192,17 +192,16 @@ void SocketService::process()
 
 void SocketService::establishConnection()
 {
-    qDebug() << "status of socket" << this->thread() << "connection:" << socket->isValid();
+    qDebug() << "[Socket Service] Thread:" << this->thread() << "| Valid:" << socket->isValid();
     this->address = QHostAddress(this->socket->peerAddress().toIPv4Address()).toString();
     this->port = this->socket->peerPort();
     QByteArray idb = IDENTIFICATOR
-        + Serialization::universalSerialize({ QByteArray::number(Network::build),
-                                              net::readNetManagerIdentificator(),
-                                              netManager->getSerializedConnectionList() });
+        + Serialization::serialize({ QByteArray::number(Network::build), net::readNetManagerIdentificator(),
+                                     netManager->getSerializedConnectionList() });
     this->distMsg(idb, SocketPair(this->address.toStdString(), this->port));
-    qDebug() << "SOCKET SERVICE: socket address" << this->socket << address << port;
 
-    qDebug() << "SOCKET SERVICE: socket isOpen - " << socket->isOpen();
+    qDebug() << "[Socket Service] Address" << this->socket << address << port;
+    qDebug() << "[Socket Service] Open status:" << socket->isOpen();
 }
 
 void SocketService::setActive(bool active)
@@ -248,17 +247,17 @@ void SocketService::continueDoRead()
             {
                 QByteArray b = pendMsg.mid(IDENTIFICATOR.size());
 
-                QByteArrayList bl = Serialization::universalDeserialize(b);
+                QByteArrayList bl = Serialization::deserialize(b);
                 if (bl.length() == 3)
                 {
 
                     this->processID(bl[1]);
-                    netManager->addTempConnections(Serialization::universalDeserialize(bl[2]));
+                    netManager->addTempConnections(Serialization::deserialize(bl[2]));
                     netManager->checkOnValidConnection(this->getID().toByteArray(),
                                                        this->getAddress().toLocal8Bit());
-                    netManager->connectToServerByIpList(Serialization::universalDeserialize(bl[2]));
+                    netManager->connectToServerByIpList(Serialization::deserialize(bl[2]));
 
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
                     int netBuild = bl[0].toInt();
                     if (netBuild != Network::build)
                     {
@@ -289,7 +288,7 @@ void SocketService::continueDoRead()
         delete[] pckg;
         if (socket->bytesAvailable() >= pendMsgSize)
         {
-            QTimer::singleShot(0, this, &SocketService::doRead);
+            doRead();
         }
     }
 }
@@ -305,7 +304,7 @@ void SocketService::gotMessage(QByteArray msg, SocketPair rec)
         return;
     if (dbm.protocol != Config::Net::PROTOCOL_VERSION)
         return;
-    //    QByteArrayList msgList = Serialization::universalDeserialize(bmsg, 8);
+    //    QByteArrayList msgList = Serialization::deserialize(bmsg, 8);
     //    QByteArray checkProtocol;
     //    if (msgList.length() > 0)
     //        checkProtocol = msgList.at(0);
@@ -316,7 +315,7 @@ void SocketService::gotMessage(QByteArray msg, SocketPair rec)
     //    }
     if (bmsg == Config::Net::PROTOCOL_VERSION)
     {
-        qDebug() << "Protocol msg COLLECTED";
+        qDebug() << "[Socket Service] Protocol msg COLLECTED";
         counter = 1;
     }
     //    switch (counter)

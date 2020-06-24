@@ -15,7 +15,7 @@ QThread *ThreadPool::addThread(QList<QObject *> workers)
     QThread *thread = new QThread();
     for (const auto &worker : workers)
     {
-        //#ifdef EXTRACOIN_CLIENT
+        //#ifdef EXTRACHAIN_CLIENT
         worker->moveToThread(thread);
         //#endif
         QObject::connect(thread, SIGNAL(started()), worker, SLOT(process()));

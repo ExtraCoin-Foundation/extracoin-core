@@ -1,5 +1,5 @@
 #include "managers/sm_manager.h"
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
 #include "ui/wallet/walletcontroller.h"
 #endif
 
@@ -21,15 +21,15 @@ void SmartContractManager::createContractProfile(QByteArray tokenCount, QByteArr
     profileList.clear();
     profileList.append("6");
     profileList.append("1");
-    profileList.append(actor->getId().toActorId());
+    profileList.append(actor->id().toActorId());
     profileList.append(tokenName);
     profileList.append(tokenCount);
     profileList.append(relAddress);
     profileList.append(color);
     actorIndex->saveProfile(actor, profileList);
-    profileList.insert(2, actor->getKey()->sign(Serialization::universalSerialize(profileList, 4)));
+    profileList.insert(2, actor->key()->sign(Serialization::serialize(profileList, 4)));
 
-    QFile file(SmartContractStorage::CONTRACTPROFILE + actor->getId().toActorId() + ".profile");
+    QFile file(SmartContractStorage::CONTRACTPROFILE + actor->id().toActorId() + ".profile");
     if (file.exists())
     {
         qDebug() << "[SmartContractManager][createContractProfile] Error. Contract profile already exist";
@@ -37,7 +37,7 @@ void SmartContractManager::createContractProfile(QByteArray tokenCount, QByteArr
     }
     if (file.open(QIODevice::WriteOnly))
     {
-        file.write(Serialization::universalSerialize(profileList, 4));
+        file.write(Serialization::serialize(profileList, 4));
         file.close();
     }
     else
@@ -57,18 +57,17 @@ void SmartContractManager::process()
 void SmartContractManager::sendInitialTransaction(Actor<KeyPrivate> *sender, QByteArray receiver,
                                                   QByteArray quantity)
 {
-#ifdef EXTRACOIN_CLIENT
-    Transaction tx(sender->getId(), receiver, Transaction::visibleToAmount(quantity));
+    Transaction tx(sender->id(), receiver, Transaction::visibleToAmount(quantity));
     tx.setData("initcontract");
 
-    tx.setToken(sender->getId());
+    tx.setToken(sender->id());
     tx.sign(*sender);
 
+#ifdef EXTRACHAIN_CLIENT
     emit sendTransactionCreateContract(tx.serialize(), Messages::ChainMessage::contractMessage);
-#else
-    Q_UNUSED(sender)
-    Q_UNUSED(receiver)
-    Q_UNUSED(quantity)
+#endif
+#ifdef EXTRACHAIN_CONSOLE
+    emit initConsoleToken(tx);
 #endif
 }
 
@@ -76,7 +75,7 @@ Actor<KeyPrivate> *SmartContractManager::createContract(QByteArray tokenName)
 {
     Actor<KeyPrivate> *actor = new Actor<KeyPrivate>();
 
-    actor->init(false);
+    actor->create(ActorType::Wallet);
 
     emit verifyActor(actor->convertToPublic());
     actorIndex->addActor(actor->convertToPublic());
@@ -88,9 +87,9 @@ Actor<KeyPrivate> *SmartContractManager::createContract(QByteArray tokenName)
 
 void SmartContractManager::savePrivateActor(Actor<KeyPrivate> actor)
 {
-    qDebug() << "Attempting to save Private Actor" << actor.getId();
+    qDebug() << "Attempting to save Private Actor" << actor.id();
 
-    QString fileName = KeyStore::makeKeyFileName(actor.getId().toActorId());
+    QString fileName = KeyStore::makeKeyFileName(actor.id().toActorId());
     QString path = SmartContractStorage::CONTRACTSTORE + fileName;
     qDebug() << "Path=" << path;
     QFile file(path);
@@ -98,13 +97,14 @@ void SmartContractManager::savePrivateActor(Actor<KeyPrivate> actor)
     // move to another place
     FileSystem::createFolderIfNotExist(SmartContractStorage::CONTRACTSTORE);
 
+    // TODO: encrypt
     if (file.open(QIODevice::ReadWrite))
     {
         QByteArray old;
         old = file.readAll();
         if (old == actor.serialize())
         {
-            qDebug() << "Private actor with id =" << actor.getId() << "already exists";
+            qDebug() << "Private actor with id =" << actor.id() << "already exists";
         }
         else
         {
@@ -112,13 +112,13 @@ void SmartContractManager::savePrivateActor(Actor<KeyPrivate> actor)
             qDebug() << "actor serial: ---- " << actor.serialize();
             file.write(actor.serialize());
             file.flush();
-            qDebug() << "Private Actor" << actor.getId() << "is successfully saved";
+            qDebug() << "Private Actor" << actor.id() << "is successfully saved";
         }
         file.close();
         return;
     }
 
-    qDebug() << "Can't save actor" << actor.getId();
+    qDebug() << "Can't save actor" << actor.id();
 }
 
 void SmartContractManager::initializeTokenArray()
@@ -133,7 +133,7 @@ void SmartContractManager::initializeTokenArray()
         if (file.open(QIODevice::ReadOnly))
         {
             QByteArray data = file.readLine();
-            QList<QByteArray> list = Serialization::universalDeserialize(data, 4);
+            QList<QByteArray> list = Serialization::deserialize(data, 4);
             if (list.size() != 7)
             {
                 qDebug() << "[smm_manager][initializeTokenArray] Error when open file " << file.fileName()

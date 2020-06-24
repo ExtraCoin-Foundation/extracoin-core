@@ -21,26 +21,6 @@
 class NetManager;
 #include "network/network_manager.h"
 #endif
-struct InviteChatMessages
-{
-    QByteArray id;
-    QByteArray owner;
-    QByteArray key;
-    const QByteArray serialize();
-    InviteChatMessages();
-    InviteChatMessages(const QByteArray &serialized);
-};
-
-struct ChatMessage
-{
-    QByteArray id;
-    QByteArray senderMsg;
-    QByteArray message;
-    QByteArray salt;
-    const QByteArray serialize();
-    ChatMessage();
-    ChatMessage(const QByteArray &serialized);
-};
 
 class ChatManager : public QObject
 {
@@ -59,7 +39,7 @@ private:
     void InitializeConnectSignalSlot(); //-
     QByteArray generateChatId();        //+
     QByteArray generateChatKey();       //+
-    QByteArray getPathToMyChats();      //+ keystore/chats/
+    QString getPathToMyChats();         //+ keystore/chats/
     void parseInvite();
     // bool isUserVerify(QByteArray chatId, QByteArray actorId);
     // void createLocalChatFile(QByteArray chatId, QByteArray pathCreate, QByteArray chatPath); //?
@@ -83,19 +63,21 @@ public slots:
     QByteArray CreateNewChat();                                       //+
 
     void InviteToChat(QByteArray chatId, QByteArray actorId); //+
-    void sendChatFile(QByteArray chatId, QString filePath);
-    void SendMessage(QByteArray chatId, QByteArray message); //+
-    void createDialogue(QByteArray actorId);                 //+
-    void requestChatList();                                  //+
-    void requestChat(QByteArray chatId);                     //-
+    void sendChatFile(ChatFileSender chatFile);
+    void SendMessage(QByteArray chatId, QByteArray message, QString type); //+
+    void removeChatMessage(QString chatId, QString messId);
+    void createDialogue(QByteArray actorId); //+
+    void requestChatList();                  //+
+    void requestChat(QByteArray chatId);     //-
     void chatRemoved(QByteArray chatId);
-    void changes(QString path);
+    void changes(QString path, DfsStruct::ChangeType changeType);
     void process();
     void fileLoaded(const QString &path);
     void initChat(bool status, int type);
+    Chat *getChatMemory(QByteArray chatId);
 
 signals:
-    void newNotify(const notification ntf);
+    void newNotify(const Notification ntf);
     void UIsendAllChats(QList<Chat *> chatList); // need connect to UI
     void sendDataToBlockhainFromChatManager(const QString &path,
                                             const DfsStruct::Type &type); //----- connet with dfs
@@ -109,7 +91,7 @@ signals:
     void finished();
     void sendEditSql(QString userId, QString fileName, DfsStruct::Type type, int sqlType,
                      QByteArrayList sqlChanges);
-    void send(int saveType, QString file, QByteArray data, const DfsStruct::Type type);
+    void send(DfsStruct::DfsSave saveType, QString file, QByteArray data, const DfsStruct::Type type);
     void requestFile(const QString &filePath, const SocketPair &receiver = SocketPair());
 };
 

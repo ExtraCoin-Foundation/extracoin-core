@@ -15,8 +15,7 @@ static bool isChainMessage(unsigned int value)
 {
     if (value >= 100 && value <= 199)
         return true;
-    else
-        return false;
+    return false;
 }
 enum GeneralRequest
 {
@@ -26,14 +25,14 @@ enum GeneralRequest
     GetBlock = 203,
     GetTx = 204,
     GetTxPair = 205,
-    GetAllActors = 206
+    GetAllActors = 206,
+    Notification = 270
 };
 static bool isGeneralRequest(unsigned int value)
 {
     if (value >= 200 && value <= 299)
         return true;
-    else
-        return false;
+    return false;
 }
 enum GeneralResponse
 {
@@ -70,14 +69,15 @@ enum DFSMessage
     requestCardPath = 412,
     responseCardPath = 413,
 
+    fileCompleted = 414,
+
     none = 499
 };
 static bool isDFSMessage(unsigned int value)
 {
     if (value >= 400 && value <= 499)
         return true;
-    else
-        return false;
+    return false;
 }
 enum VerifyRequest
 {
@@ -88,8 +88,7 @@ static bool isVerifyRequest(unsigned int value)
 {
     if (value >= 500 && value <= 599)
         return true;
-    else
-        return false;
+    return false;
 }
 }
 #endif // MESSAGE_TYPES_H

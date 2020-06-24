@@ -8,6 +8,10 @@
 #include "managers/chatmanager.h"
 #include "managers/account_controller.h"
 
+#ifdef EXTRACHAIN_CONSOLE
+#include "managers/console_manager.h"
+#endif
+
 void ResolverService::setNode(NodeManager *value)
 {
     node = value;
@@ -93,7 +97,7 @@ bool ResolverService::validate(const Messages::BaseMessage &message)
         return false;
     Actor<KeyPublic> actor = actorIndex->getActor(signer);
 
-    if (!actor.isEmpty())
+    if (!actor.empty())
     {
         return message.verifyDigSig(actor);
     }
@@ -192,7 +196,7 @@ void ResolverService::resolveTask()
 
 void ResolverService::resolveGeneralTask()
 {
-    QList<QByteArray> res = Serialization::universalDeserialize(msg);
+    QList<QByteArray> res = Serialization::deserialize(msg);
     using namespace Messages;
     BaseMessage message;
     message = msg;
@@ -249,7 +253,7 @@ void ResolverService::resolveGeneralTask()
         responseMessage = msg;
         if (checkResponseHandler(responseMessage.dataHash))
             return;
-        actorIndex->handleNewAllActors(Serialization::universalDeserialize(responseMessage.data, 4));
+        actorIndex->handleNewAllActors(Serialization::deserialize(responseMessage.data, 4));
         finishWork();
         break;
     }
@@ -300,11 +304,14 @@ void ResolverService::resolveGeneralTask()
     }
     case Messages::ChainMessage::txMessage: {
         Transaction tx(message.data);
-        //        if (!validate(tx))
-        //        {
-        //            qDebug() << "Received tx" << tx.getHash() << "is not valid";
-        //            return;
-        //        }
+
+        if (!validate(tx))
+        {
+            qDebug() << "Received tx" << tx.getHash() << "is not valid";
+            return;
+        }
+        // transaction - fee
+
         emit newTx(tx);
         finishWork();
         break;
@@ -447,6 +454,17 @@ void ResolverService::resolveGeneralTask()
         finishWork();
         break;
     }
+    case Messages::GeneralRequest::Notification: {
+#ifdef EXTRACHAIN_CONSOLE
+        BaseMessageResponse responseMessage;
+        responseMessage = msg;
+        auto map = Serialization::deserializeMap(responseMessage.data);
+        node->consoleManager()->pushManager()->saveNotificationToken(map["os"], map["actor"], map["token"]);
+#endif
+
+        finishWork();
+        break;
+    }
     default: {
         finishWork();
         break;
@@ -466,14 +484,13 @@ bool ResolverService::validate(const Transaction &tx)
 {
     qDebug() << "RESOLVER SERVICE: "
              << "validate(Transaction):";
+    if (tx.getSender() == 0 && tx.getData().contains(Fee::STAKING_REWARD))
+        return true;
+    if (actorIndex->getActor(tx.getSender()).empty())
+    {
+        this->thread()->sleep(5);
+        return validate(tx);
+    }
     bool result = actorIndex->validateTx(tx);
-    //    if (tx.getData() == "initcontract")
-    //        result = (result && !actorIndex->getActor(tx.getSender()).profile().getProfile().isEmpty());
-    if (!actorIndex->getActor(tx.getSender()).isEmpty())
-        if (actorIndex->getActor(tx.getSender()).profile().getProfile().isEmpty())
-        {
-            this->thread()->sleep(5);
-            return validate(tx);
-        }
     return result;
 }

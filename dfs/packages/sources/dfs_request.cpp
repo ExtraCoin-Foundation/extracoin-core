@@ -24,10 +24,41 @@ short DistFileSystem::DfsRequest::getFieldsCount() const
 
 QByteArray DistFileSystem::DfsRequest::serialize() const
 {
-    return Serialization::universalSerialize({ filePath.toLocal8Bit() }, DistFileSystem::fieldsSize);
+    return Serialization::serialize({ filePath.toLocal8Bit() }, DistFileSystem::fieldsSize);
 }
 
 void DistFileSystem::DfsRequest::deserialize(const QByteArray &serialized)
 {
-    filePath = Serialization::universalDeserialize(serialized, DistFileSystem::fieldsSize).takeFirst();
+    filePath = Serialization::deserialize(serialized, DistFileSystem::fieldsSize).takeFirst();
+}
+
+bool DistFileSystem::DfsRequestFinished::isEmpty() const
+{
+    return filePath.isEmpty();
+}
+
+const QList<QByteArray> DistFileSystem::DfsRequestFinished::serializedParams() const
+{
+    return {};
+}
+
+void DistFileSystem::DfsRequestFinished::operator=(QByteArray &serialized)
+{
+    deserialize(serialized);
+}
+
+short DistFileSystem::DfsRequestFinished::getFieldsCount() const
+{
+    return DfsRequestFinished::FIELDS_COUNT;
+}
+
+QByteArray DistFileSystem::DfsRequestFinished::serialize() const
+{
+    return "{\"filePath\":\"" + filePath.toLatin1() + "\"}";
+}
+
+void DistFileSystem::DfsRequestFinished::deserialize(const QByteArray &serialized)
+{
+    QJsonDocument json = QJsonDocument::fromJson(serialized);
+    filePath = json["filePath"].toString();
 }

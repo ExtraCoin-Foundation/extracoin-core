@@ -28,14 +28,13 @@ private:
 public:
     AccountController(ActorIndex *actorIndex);
     QList<QByteArray> getAccountID();
-    FileList sentTxList;
 
 public:
     /**
      * @brief Generates a new actor and adds it into accounts list
      * @return created actor
      */
-    Actor<KeyPrivate> createActor(int account);
+    Actor<KeyPrivate> createActor(ActorType account, QByteArray hashLogin);
     //    Actor<KeyPrivate> createActorWithId(BigNumber id, bool account, bool contract = false);
     Actor<KeyPrivate> getActor(BigNumber id);
     /**
@@ -43,7 +42,7 @@ public:
      * @param pubkey - serialized public key
      * @return actor
      */
-    Actor<KeyPrivate> getActor(QByteArray pubkey);
+    Actor<KeyPrivate> getActorByPublicKey(QByteArray pubkey);
     Actor<KeyPrivate> getActor(int number);
 
     Actor<KeyPrivate> *getMainActor();
@@ -67,17 +66,19 @@ public:
     void setActorIndex(ActorIndex *value);
 
     void setBlockchain(Blockchain *value);
+    Blockchain *getBlockchain() const;
+    QList<BigNumber> getListAccounts() const;
 
 public slots:
     /**
      * @brief Loads actors from local disk to memory: QList accounts;
      */
-    void loadActors(QByteArray id = "", QByteArrayList idList = {});
+    void loadActors(QByteArray id = "", QByteArrayList idList = {}, QByteArray hashLogin = "");
     /**
      * @brief Saves Private actor on local disk in serialized form
      * @param private actor
      */
-    void savePrivateActor(Actor<KeyPrivate> actor);
+    void savePrivateActor(Actor<KeyPrivate> actor, QByteArray hashLogin);
     //    void regNewUser(bool account);
     void clearAcc();
     void changeUserNum(QByteArray);

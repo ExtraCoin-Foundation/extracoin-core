@@ -16,7 +16,7 @@
 #include "profile/private_profile.h"
 #include "managers/chat.h"
 #include "dfs/controls/headers/subscribe_controller.h"
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
 #include "ui/ui_controller.h"
 #endif
 
@@ -45,10 +45,14 @@ Q_DECLARE_METATYPE(UIMessage)
 Q_DECLARE_METATYPE(QList<UIMessage>)
 Q_DECLARE_METATYPE(Network::DataStruct)
 Q_DECLARE_METATYPE(SubscribeController)
-Q_DECLARE_METATYPE(notification)
-Q_DECLARE_METATYPE(QList<notification>)
-
-#ifdef EXTRACOIN_CLIENT
+Q_DECLARE_METATYPE(Notification)
+Q_DECLARE_METATYPE(QList<Notification>)
+Q_DECLARE_METATYPE(ChatFileSender)
+Q_DECLARE_METATYPE(DFSResolverService::FinishStatus)
+Q_DECLARE_METATYPE(DfsStruct::DfsSave)
+Q_DECLARE_METATYPE(DfsStruct::ChangeType)
+Q_DECLARE_METATYPE(ActorType)
+#ifdef EXTRACHAIN_CLIENT
 Q_DECLARE_METATYPE(UiController*)
 #endif
 
@@ -78,9 +82,14 @@ void registerMetaTypes()
     qRegisterMetaType<QList<UIMessage>>();
     qRegisterMetaType<Network::DataStruct>();
     qRegisterMetaType<SubscribeController>();
-    qRegisterMetaType<notification>();
-    qRegisterMetaType<QList<notification>>();
-#ifdef EXTRACOIN_CLIENT
+    qRegisterMetaType<Notification>();
+    qRegisterMetaType<QList<Notification>>();
+    qRegisterMetaType<ChatFileSender>();
+    qRegisterMetaType<DFSResolverService::FinishStatus>();
+    qRegisterMetaType<DfsStruct::DfsSave>();
+    qRegisterMetaType<DfsStruct::ChangeType>();
+    qRegisterMetaType<ActorType>();
+#ifdef EXTRACHAIN_CLIENT
     qRegisterMetaType<UiController*>();
 #endif
 }

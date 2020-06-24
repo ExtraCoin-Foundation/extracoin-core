@@ -6,12 +6,6 @@
 #include <algorithm>
 #include "datastorage/block.h"
 #include "utils/utils.h"
-#include "datastorage/tx_pair.h"
-
-using std::begin;
-using std::end;
-using std::find_if;
-using std::remove_if;
 
 class MemIndex
 {
@@ -37,19 +31,21 @@ public:
     Block getByData(const QByteArray &data) const;
     Block getByHash(const QByteArray &hash) const;
 
-    Transaction getLastTxByHash(const QByteArray &hash, const QByteArray &token) const;
-    Transaction getLastTxBySender(const BigNumber &id, const QByteArray &token) const;
-    Transaction getLastTxByReceiver(const BigNumber &id, const QByteArray &token) const;
-    Transaction getLastTxBySenderOrReceiver(const BigNumber &id, const QByteArray &token) const;
-    Transaction getLastTxBySenderOrReceiverAndToken(const BigNumber &id, const QByteArray &token) const;
-    Transaction getLastTxByApprover(const BigNumber &id, const QByteArray &token) const;
-    TxPair searchPair(const BigNumber &senderId, const BigNumber &receiverId) const;
-
+    std::pair<Transaction, QByteArray> getLastTxByHash(const QByteArray &hash, const QByteArray &token) const;
+    std::pair<Transaction, QByteArray> getLastTxBySender(const BigNumber &id, const QByteArray &token) const;
+    std::pair<Transaction, QByteArray> getLastTxByReceiver(const BigNumber &id,
+                                                           const QByteArray &token) const;
+    std::pair<Transaction, QByteArray> getLastTxBySenderOrReceiver(const BigNumber &id,
+                                                                   const QByteArray &token) const;
+    std::pair<Transaction, QByteArray> getLastTxBySenderOrReceiverAndToken(const BigNumber &id,
+                                                                           const QByteArray &token) const;
+    std::pair<Transaction, QByteArray> getLastTxByApprover(const BigNumber &id,
+                                                           const QByteArray &token) const;
     void removeAll();
 
 private:
-    Transaction getLastTxByParam(const BigNumber &id, SearchEnum::TxParam param,
-                                 const QByteArray &token) const;
+    std::pair<Transaction, QByteArray> getLastTxByParam(const BigNumber &id, SearchEnum::TxParam param,
+                                                        const QByteArray &token) const;
 };
 
 #endif // MEMINDEX_H

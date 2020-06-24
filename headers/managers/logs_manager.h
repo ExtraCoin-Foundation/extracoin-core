@@ -7,7 +7,7 @@
 #include <QDir>
 #include <QDateTime>
 #include <iostream>
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
 #include "ui/model/abstractmodel.h"
 #endif
 
@@ -37,7 +37,7 @@ public:
     static bool toQml;
     static bool antiFilter;
     static bool debugLogs;
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     static AbstractModel logs;
 #endif
 

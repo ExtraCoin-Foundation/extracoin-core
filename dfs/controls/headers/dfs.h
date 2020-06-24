@@ -2,7 +2,6 @@
 #define DFS_H
 
 #include "dfs/managers/headers/card_manager.h"
-#include "dfs/packages/headers/ui_messages.h"
 #include "dfs/packages/headers/dfs_changes.h"
 #include "dfs/packages/headers/all.h"
 #include "dfs/managers/headers/sender.h"
@@ -15,7 +14,7 @@
 #include <QTimer>
 #include <QDirIterator>
 #include <iterator>
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
 #include <QImage>
 #include <QImageReader>
 #endif
@@ -31,15 +30,18 @@ private:
     ActorIndex *actorIndex = nullptr;
     DBConnector uCards;
     Sender *sender = nullptr;
+    bool myQuickMode = false;
     // DFSResolver *resolver;
+
 public slots:
     /*DFS 1.5*/
-    void dfsSyncUsers(QList<QString> userID, const SocketPair &receiver = SocketPair());
+    void dfsSyncUsers(QList<QString> userId, const SocketPair &receiver = SocketPair());
     void dfsSyncT();
     void dfsSync(const SocketPair &receiver);
-    bool dfsValidate(QByteArray userID);
+    bool dfsValidate(QByteArray userId);
     QList<QByteArray> dfsValidateAll();
     /*DFS 1.5*/
+
 private:
     void initDFS(const QByteArray &userId);
     void saveToDFS(const QString &path, const QByteArray &data,
@@ -79,24 +81,27 @@ signals:
 
     void resolveMsg(const QByteArray &msg, int dMsgType, const SocketPair &receiver);
     void sendQ(const QString &filePath, const DfsStruct::Type &type, const SocketPair &receiver);
-    void usersChanges(const QByteArray &path, const DfsStruct::Type &type, const QByteArray &actorId);
-    void fileChanged(QString path);
-    void sendFromNetwork(int saveType, QString file, QByteArray data, const DfsStruct::Type type);
+    void fileAdded(QString path, QString original, DfsStruct::Type type, QString actorId);
+    void fileChanged(QString path, DfsStruct::ChangeType changeType);
+    void fileDuplicated(QString path, QString original, DfsStruct::Type type);
+    void fileNetworkCompleted(QString filePath, SocketPair pair);
     void connectToServer();
     void networkCreated();
-    void newNotify(const notification ntf);
     void requestFile(const QString &filePath, const SocketPair &receiver = SocketPair());
     void titleReceived(QString filePath);
+    void chatMessage(QString sender, QString msgPath);
 
 public slots:
     void initMyLocalStorage();
     void initUser(BigNumber userId);
 
-    void save(int saveType, QString file, QByteArray data, const DfsStruct::Type type);
+    void reportFileCompleted(QString filePath, SocketPair receiver);
+    void save(DfsStruct::DfsSave saveType, QString file, QByteArray data, const DfsStruct::Type type);
     void editData(QString userId, QString fileName, DfsStruct::Type type, QByteArray data);
     void editSqlDatabase(QString userId, QString fileName, DfsStruct::Type type, int sqlType,
                          QByteArrayList sqlChanges);
-    bool applyChanges(const DistFileSystem::DfsChanges &dfsChanges);
+    bool applyChanges(DistFileSystem::DfsChanges &dfsChanges);
+    void applyReplace(QString userId, QString fileName, QString dfsFileName, DfsStruct::Type type);
     // void appendData(QString userId, QString fileName, QByteArray data);
     void process();
     void startDFS();
@@ -106,18 +111,20 @@ public slots:
     void searchTmp();
     void requestCardById(QByteArray userId, const SocketPair &receiver = SocketPair());
     void requestAllCards();
+    void enableMyQuickMode();
+    void disableMyQuickMode();
 
 private:
-    QByteArray buildDfsPath(QString originalFile, QByteArray hash, QByteArray userID, DfsStruct::Type type);
+    QString buildDfsPath(QString originalFile, QByteArray hash, QByteArray userId, DfsStruct::Type type);
     bool createStored(QString filePath, const QByteArray &userId, const DfsStruct::Type &type);
-    bool appendToStored(QString filePath, QByteArray data, QString range, int type, QString userId, bool init,
-                        QByteArray hash);
+    bool appendToStored(DistFileSystem::DfsChanges &dfsChanges, bool init);
     void updateFromNewStored(QString filePath);
     bool applyChangesBytes(const DistFileSystem::DfsChanges &dfsChanges);
     bool applyChangesSql(const DistFileSystem::DfsChanges &dfsChanges);
     DfsStruct::Type getFileType(const QString &filePath);
     bool isHaveStoredType(int type);
 
+    QSet<QString> ignoredIds;
     QTimer *timerTmpFiles;
     QStringList m_tmpFiles;
     QVector<std::pair<qint64, QString>> m_reqFiles;

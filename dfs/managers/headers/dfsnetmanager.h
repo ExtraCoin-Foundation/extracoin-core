@@ -11,11 +11,11 @@ class SocketService;
 #include "resolve/dfs_resolver_service.h"
 #include "utils/utils.h"
 
-#ifdef EXTRACOIN_CONSOLE
+#ifdef EXTRACHAIN_CONSOLE
 static const short DFS_RESOLVERS_POOL_SIZE = 10;
 #endif
 
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
 static const short DFS_RESOLVERS_POOL_SIZE = 5;
 #endif
 
@@ -49,9 +49,6 @@ private:
 public:
     NetManager *getNetManager();
     void *MessageReceived(const QByteArray &msg, const SocketPair &receiver) override;
-    void send(const QByteArray &message, const unsigned int &msgType,
-              const SocketPair &receiver = SocketPair());
-
     void setDfs(Dfs *value);
     bool isLoading(const QString &fileName);
 
@@ -70,7 +67,7 @@ public slots:
     void startDFSNetwork();
     void uiReconnect();
     void titleArrived(Network::DataStruct ds);
-    void removeResolver();
+    void removeResolver(DFSResolverService::FinishStatus status);
 
 private slots:
     void removeConnection();

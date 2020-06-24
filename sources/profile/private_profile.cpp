@@ -20,8 +20,7 @@ void PrivateProfile::savePrivateProfile(const QByteArray &hash, const QByteArray
     QByteArray data = "";
     writeData(map, data);
     data = hash + data;
-    blowFish_crypt crypt;
-    data = crypt.EncryptBlowFish(data, hash);
+    data = BlowFish::encrypt(data, hash);
     QFile file(PathProfile + "/" + id + ".private");
     file.open(QIODevice::WriteOnly);
     file.write(data);
@@ -44,8 +43,7 @@ void PrivateProfile::editPrivateProfile(QPair<QByteArray, QByteArray> profile, c
     }
     file.open(QIODevice::ReadWrite);
     QByteArray data = file.readAll();
-    blowFish_crypt crypt;
-    data = crypt.DecryptBlowFish(data, hashLogin);
+    data = BlowFish::decrypt(data, hashLogin);
     if (data.mid(0, 64) == hashLogin)
     {
         data = data.mid(64);
@@ -58,7 +56,7 @@ void PrivateProfile::editPrivateProfile(QPair<QByteArray, QByteArray> profile, c
         data.clear();
         writeData(map, data);
         data = hashLogin + data;
-        data = crypt.EncryptBlowFish(data, hashLogin);
+        data = BlowFish::encrypt(data, hashLogin);
         file.resize(0);
         file.write(data);
     }
@@ -76,8 +74,7 @@ void PrivateProfile::loadInfoFromPrivateProfile(const QByteArray &hash, const QB
     QByteArray data = file.readAll();
     file.flush();
     file.close();
-    blowFish_crypt crypt;
-    data = crypt.DecryptBlowFish(data, hash);
+    data = BlowFish::decrypt(data, hash);
     QByteArray secureLoginFile = data.mid(0, 64);
     if (secureLoginFile == hash)
     {
@@ -128,8 +125,7 @@ void PrivateProfile::profile(const QByteArray &hash)
             QByteArray data = file.readAll();
             file.flush();
             file.close();
-            blowFish_crypt crypt;
-            data = crypt.DecryptBlowFish(data, hash);
+            data = BlowFish::decrypt(data, hash);
             QByteArray secureLoginFile = data.mid(0, 64);
             if (secureLoginFile == hash)
             {
@@ -140,7 +136,7 @@ void PrivateProfile::profile(const QByteArray &hash)
                 QList<QByteArray> idList = get(map, "wallet").split('|');
                 emit setIdProfile(idList.first());
                 qDebug() << "Load private profile with id" << idList.first();
-                acContorller->loadActors(idList.first(), idList);
+                acContorller->loadActors(idList.first(), idList, hash);
                 if (acContorller->getMainActor() != nullptr)
                     dfs->initMyLocalStorage();
                 emit initActorChatM();
@@ -148,7 +144,7 @@ void PrivateProfile::profile(const QByteArray &hash)
             else
             {
                 emit loginError(2);
-#ifdef EXTRACOIN_CONSOLE
+#ifdef EXTRACHAIN_CONSOLE
                 qInfo() << "---> Incorrect email or password";
                 std::exit(0);
 #endif
@@ -180,7 +176,7 @@ void PrivateProfile::writeData(QMap<QString, QByteArray> &map, QByteArray &out)
     QByteArray res = "";
     while (it != map.end())
     {
-        res += Serialization::universalSerialize({ it.key().toUtf8(), it.value() });
+        res += Serialization::serialize({ it.key().toUtf8(), it.value() });
         it++;
     }
     out = res;
@@ -189,7 +185,7 @@ void PrivateProfile::writeData(QMap<QString, QByteArray> &map, QByteArray &out)
 void PrivateProfile::readData(QMap<QString, QByteArray> &map, QByteArray &data)
 {
     QByteArrayList res;
-    res = Serialization::universalDeserialize(data);
+    res = Serialization::deserialize(data);
     while (res.size() != 0)
     {
         map.insert(res.at(0), res.at(1));

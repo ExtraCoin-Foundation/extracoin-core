@@ -1,3 +1,7 @@
+QT += concurrent
+INCLUDEPATH += $$PWD/headers
+INCLUDEPATH += $$PWD
+
 SOURCES += \
     $$PWD/dfs/controls/sources/subscribe_controller.cpp \
     $$PWD/dfs/managers/sources/dfsnetmanager.cpp \
@@ -16,10 +20,8 @@ SOURCES += \
     $$PWD/sources/enc/algorithms/ecc/eccmath.cpp \
     $$PWD/sources/enc/algorithms/ecc/ellipticpoint.cpp \
     $$PWD/sources/enc/algorithms/blowfish_crypt.cpp \
-    $$PWD/sources/enc/crypt_manager.cpp \
     $$PWD/sources/enc/key_private.cpp \
     $$PWD/sources/enc/key_public.cpp \
-    $$PWD/sources/enc/algorithms/xor_encrypt.cpp \
     $$PWD/sources/datastorage/index/actorindex.cpp \
     $$PWD/sources/datastorage/index/blockindex.cpp \
     $$PWD/sources/datastorage/index/memindex.cpp \
@@ -28,7 +30,7 @@ SOURCES += \
     $$PWD/sources/datastorage/contract.cpp \
     $$PWD/sources/datastorage/genesis_block.cpp \
     $$PWD/sources/datastorage/transaction.cpp \
-    $$PWD/sources/datastorage/tx_pair.cpp \
+    $$PWD/sources/managers/file_updater_manager.cpp \
     $$PWD/sources/managers/notification_manager.cpp \
     $$PWD/sources/network/packages/service/connections_message.cpp \
     $$PWD/sources/profile/profile.cpp \
@@ -48,6 +50,7 @@ SOURCES += \
     $$PWD/sources/resolve/resolve_manager.cpp \
     $$PWD/sources/resolve/resolver_service.cpp \
     $$PWD/sources/utils/bignumber.cpp \
+    $$PWD/sources/utils/coinprocess.cpp \
     $$PWD/sources/utils/db_connector.cpp \
     $$PWD/sources/utils/utils.cpp \
     $$PWD/sources/utils/Keccak256.cpp \
@@ -63,8 +66,7 @@ SOURCES += \
     $$PWD/sources/network/packages/service/get_tx_pair_message.cpp \
     $$PWD/sources/network/server_service.cpp \
     $$PWD/sources/network/socket_service.cpp \
-    $$PWD/sources/network/upnpconnection.cpp \
-    $$PWD/sources/managers/console_manager.cpp
+    $$PWD/sources/network/upnpconnection.cpp
 
 HEADERS += \
     $$PWD/dfs/controls/headers/subscribe_controller.h \
@@ -82,17 +84,15 @@ HEADERS += \
     $$PWD/headers/enc/algorithms/ecc/curves.h \
     $$PWD/headers/enc/algorithms/ecc/eccmath.h \
     $$PWD/headers/enc/algorithms/ecc/ellipticpoint.h \
-    $$PWD/headers/enc/algorithms/xor_encrypt.h \
-    $$PWD/headers/enc/crypt_manager.h \
     $$PWD/headers/enc/key_private.h \
     $$PWD/headers/enc/key_public.h \
-    $$PWD/headers/enc/crypt_interface.h \
     $$PWD/headers/enc/sign_interface.h \
     $$PWD/headers/datastorage/searchfilters.h \
     $$PWD/dfs/packages/headers/dfs_changes.h \
     $$PWD/dfs/types/headers/cardfile.h \
     $$PWD/headers/managers/chat.h \
     $$PWD/headers/managers/chatmanager.h \
+    $$PWD/headers/managers/file_updater_manager.h \
     $$PWD/headers/managers/notification_manager.h \
     $$PWD/headers/metatypes.h \
     $$PWD/dfs/packages/headers/dfs_request.h \
@@ -105,7 +105,6 @@ HEADERS += \
     $$PWD/headers/datastorage/contract.h \
     $$PWD/headers/datastorage/genesis_block.h \
     $$PWD/headers/datastorage/transaction.h \
-    $$PWD/headers/datastorage/tx_pair.h \
     $$PWD/headers/network/packages/service/connections_message.h \
     $$PWD/headers/network/packages/service/message_types.h \
     $$PWD/headers/profile/profile.h \
@@ -127,8 +126,8 @@ HEADERS += \
     $$PWD/headers/resolve/resolver_service.h \
     $$PWD/headers/utils/Keccak256.h \
     $$PWD/headers/utils/bignumber.h \
+    $$PWD/headers/utils/coinprocess.h \
     $$PWD/headers/utils/db_connector.h \
-    $$PWD/headers/utils/list_container.h \
     $$PWD/dfs/controls/headers/dfs.h \
     $$PWD/dfs/managers/headers/card_manager.h \
     $$PWD/dfs/types/headers/dfstruct.h \
@@ -149,5 +148,32 @@ HEADERS += \
     $$PWD/headers/network/socket_service.h \
     $$PWD/headers/network/upnpconnection.h \
     $$PWD/headers/utils/utils.h \
-    $$PWD/test.h \
-    $$PWD/headers/managers/console_manager.h
+    $$PWD/test.h
+
+linux: QMAKE_CXXFLAGS += -Wall -Werror=return-type -Werror=implicit-fallthrough -Wno-unused-function # -Wno-unused-value -Wno-unused-parameter -Wno-unused-variable
+
+!android {
+!android!ios: DESTDIR = ExtraChain
+android: DESTDIR = android-build
+OBJECTS_DIR = .obj
+MOC_DIR = .moc
+RCC_DIR = .qrc
+UI_DIR = .ui
+}
+
+QMAKE_SPEC_T = $$[QMAKE_SPEC]
+contains(QMAKE_SPEC_T,.*win32.*) {
+    COMPILE_DATE=$$system(date /t)
+} else {
+    COMPILE_DATE=$$system(date +%m.%d)
+}
+
+GIT_COMMIT_CORE = $$system(git --git-dir .git --work-tree $$PWD describe --always --tags)
+GIT_BRANCH_CORE = $$system(git --git-dir .git --work-tree $$PWD symbolic-ref --short HEAD)
+QMAKE_SUBSTITUTES += preconfig.h.in
+
+include(../extrachain-3rdparty/extrachain-libs.pri)
+
+lessThan(QT_MAJOR_VERSION, 5): error("requires Qt 5.14+")
+lessThan(QT_MINOR_VERSION, 14): error("requires Qt 5.14+")
+# lessThan(QT_PATCH_VERSION, 0): error("requires Qt 5.14+")

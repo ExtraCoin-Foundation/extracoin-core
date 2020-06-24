@@ -7,14 +7,11 @@ BlockIndex::BlockIndex()
     firstSavedId = loadFirstId();
     lastSavedId = loadLastId();
     QDir dir(DataStorage::BLOCKCHAIN_INDEX + '/' + folderName);
-    QFileInfoList sectionList =
-        dir.entryInfoList(QDir::Filter::Dirs | QDir::Filter::NoDot | QDir::Filter::NoDotDot);
+    QFileInfoList sectionList = dir.entryInfoList(QDir::Filter::Dirs | QDir::NoDotAndDotDot);
     int count = 0;
     for (auto &el : sectionList)
     {
-
-        QFileInfoList files =
-            el.dir().entryInfoList(QDir::Filter::Dirs | QDir::Filter::NoDot | QDir::Filter::NoDotDot);
+        QFileInfoList files = el.dir().entryInfoList(QDir::Filter::Dirs | QDir::NoDotAndDotDot);
         count += files.size();
     }
     records = count;
@@ -188,33 +185,38 @@ Block BlockIndex::getBlockByParam(const BigNumber &id, SearchEnum::BlockParam pa
     return Block();
 }
 
-Transaction BlockIndex::getLastTxByHash(const QByteArray &hash, const QByteArray &token) const
+std::pair<Transaction, QByteArray> BlockIndex::getLastTxByHash(const QByteArray &hash,
+                                                               const QByteArray &token) const
 {
     return getLastTxByParam(BigNumber(hash), SearchEnum::TxParam::Hash, token);
 }
 
-Transaction BlockIndex::getLastTxBySender(const BigNumber &id, const QByteArray &token) const
+std::pair<Transaction, QByteArray> BlockIndex::getLastTxBySender(const BigNumber &id,
+                                                                 const QByteArray &token) const
 {
     return getLastTxByParam(id, SearchEnum::TxParam::UserSender, token);
 }
 
-Transaction BlockIndex::getLastTxByReceiver(const BigNumber &id, const QByteArray &token) const
+std::pair<Transaction, QByteArray> BlockIndex::getLastTxByReceiver(const BigNumber &id,
+                                                                   const QByteArray &token) const
 {
     return getLastTxByParam(id, SearchEnum::TxParam::UserReceiver, token);
 }
 
-Transaction BlockIndex::getLastTxBySenderOrReceiver(const BigNumber &id, const QByteArray &token) const
+std::pair<Transaction, QByteArray> BlockIndex::getLastTxBySenderOrReceiver(const BigNumber &id,
+                                                                           const QByteArray &token) const
 {
     return getLastTxByParam(id, SearchEnum::TxParam::UserSenderOrReceiver, token);
 }
 
-Transaction BlockIndex::getLastTxBySenderOrReceiverAndToken(const BigNumber &id,
-                                                            const QByteArray &token) const
+std::pair<Transaction, QByteArray>
+BlockIndex::getLastTxBySenderOrReceiverAndToken(const BigNumber &id, const QByteArray &token) const
 {
     return getLastTxByParam(id, SearchEnum::TxParam::UserSenderOrReceiverOrToken, token);
 }
 
-Transaction BlockIndex::getLastTxByApprover(const BigNumber &id, const QByteArray &token) const
+std::pair<Transaction, QByteArray> BlockIndex::getLastTxByApprover(const BigNumber &id,
+                                                                   const QByteArray &token) const
 {
     return getLastTxByParam(id, SearchEnum::TxParam::UserApprover, token);
 }
@@ -230,15 +232,16 @@ QList<Transaction> BlockIndex::getTxsBySenderOrReceiverInRow(const BigNumber &id
 
 //}
 
-Transaction BlockIndex::getLastTxByParam(const BigNumber &id, SearchEnum::TxParam param,
-                                         const QByteArray &token) const
+std::pair<Transaction, QByteArray>
+BlockIndex::getLastTxByParam(const BigNumber &id, SearchEnum::TxParam param, const QByteArray &token) const
 {
     BigNumber records = getRecords();
+    QByteArray tokenActor = BigNumber(token).toActorId();
 
     if (records == 0)
     {
         qDebug() << "There no tx's in blockIndex";
-        return Transaction();
+        return { Transaction(), "-1" };
     }
 
     BigNumber lastBlockId = getLastSavedId();
@@ -248,41 +251,42 @@ Transaction BlockIndex::getLastTxByParam(const BigNumber &id, SearchEnum::TxPara
     {
         Block lastBlock = getBlockById(lastBlockId);
         QList<Transaction> txs = lastBlock.extractTransactions();
+
         for (const Transaction &tx : txs)
         {
-            if (tx.getToken().toActorId() != token)
+            if (tx.getToken().toActorId() != tokenActor)
                 continue;
             switch (param)
             {
             case SearchEnum::TxParam::UserSenderOrReceiverOrToken: {
 
                 if (tx.getSender() == id || tx.getReceiver() == id)
-                    return tx;
+                    return { tx, lastBlockId.toByteArray() };
                 break;
             }
             case SearchEnum::TxParam::UserSender: {
                 if (tx.getSender() == id)
-                    return tx;
+                    return { tx, lastBlockId.toByteArray() };
                 break;
             }
             case SearchEnum::TxParam::UserReceiver: {
                 if (tx.getReceiver() == id)
-                    return tx;
+                    return { tx, lastBlockId.toByteArray() };
                 break;
             }
             case SearchEnum::TxParam::UserSenderOrReceiver: {
                 if (tx.getSender() == id || tx.getReceiver() == id)
-                    return tx;
+                    return { tx, lastBlockId.toByteArray() };
                 break;
             }
             case SearchEnum::TxParam::UserApprover: {
                 if (tx.getApprover() == id)
-                    return tx;
+                    return { tx, lastBlockId.toByteArray() };
                 break;
             }
             case SearchEnum::TxParam::Hash: {
-                if (tx.getHash() == id.toActorId())
-                    return tx;
+                if (tx.getHash() == id.toZeroByteArray(64))
+                    return { tx, lastBlockId.toByteArray() };
                 break;
             }
             default: {
@@ -291,7 +295,7 @@ Transaction BlockIndex::getLastTxByParam(const BigNumber &id, SearchEnum::TxPara
         }
         --lastBlockId;
     }
-    return Transaction();
+    return { Transaction(), "-1" };
 }
 
 QList<Transaction> BlockIndex::getTxsByParamInRow(const BigNumber &id, SearchEnum::TxParam param,
@@ -378,42 +382,6 @@ QList<Transaction> BlockIndex::getTxsByParamInRow(const BigNumber &id, SearchEnu
     return currentTxs;
 }
 
-TxPair BlockIndex::searchPair(const BigNumber &first, const BigNumber &second) const
-{
-    TxPair pair;
-
-    bool firstFound = false;
-    bool secondFound = false;
-
-    BigNumber records = getLastSavedId();
-    while (records > 0)
-    {
-        Block byPosition = getBlockById(records);
-        QList<Transaction> trx = byPosition.extractTransactions();
-
-        for (const Transaction &t : trx)
-        {
-            if (firstFound && secondFound)
-            {
-                records = 0;
-                break;
-            }
-            if (!firstFound && (t.getSender() == first || t.getReceiver() == first))
-            {
-                firstFound = true;
-                pair.setFirst(t);
-            }
-            if (!secondFound && (t.getSender() == second || t.getReceiver() == second))
-            {
-                secondFound = true;
-                pair.setSecond(t);
-            }
-        }
-        --records;
-    }
-    return pair;
-}
-
 QString BlockIndex::buildFilePath(const BigNumber &id) const
 {
     BigNumber section = this->calcSection(id);
@@ -482,11 +450,12 @@ int BlockIndex::add(const BigNumber &id, const QByteArray &_data)
                 DB.insert(Config::DataStorage::RowGenesisBlockTable, rowRow);
             }
             QByteArrayList listSign = block.getListSignatures();
-            for (int i = 0; i < listSign.size(); i += 2)
+            for (int i = 0; i < listSign.size(); i += 3)
             {
                 DBRow rowRow;
                 rowRow.insert({ "actorId", listSign[i].toStdString() });
                 rowRow.insert({ "digSig", listSign[i + 1].toStdString() });
+                rowRow.insert({ "type", listSign[i + 2].toStdString() });
                 DB.insert(Config::DataStorage::SignTable, rowRow);
             }
         }
@@ -506,31 +475,35 @@ int BlockIndex::add(const BigNumber &id, const QByteArray &_data)
             row.insert({ "hash", block.getHash().toStdString() });
             DB.insert(Config::DataStorage::BlockTable, row);
 
-            DBRow rowRow;
             QList<Transaction> rows = block.extractTransactions();
             for (const auto &tmp : rows)
             {
-                rowRow.insert({ "sender", tmp.getSender().toStdString() });
-                rowRow.insert({ "receiver", tmp.getReceiver().toStdString() });
+                DBRow rowRow;
+                rowRow.insert({ "sender", tmp.getSender().toActorId().toStdString() });
+                rowRow.insert({ "receiver", tmp.getReceiver().toActorId().toStdString() });
                 rowRow.insert({ "amount", tmp.getAmount().toStdString() });
                 rowRow.insert({ "date", QByteArray::number(tmp.getDate()).toStdString() });
-                rowRow.insert({ "token", tmp.getToken().toStdString() });
+                rowRow.insert({ "token", tmp.getToken().toActorId().toStdString() });
                 rowRow.insert({ "data", tmp.getData().toStdString() });
                 rowRow.insert({ "prevBlock", tmp.getPrevBlock().toStdString() });
                 rowRow.insert({ "gas", QByteArray::number(tmp.getGas()).toStdString() });
                 rowRow.insert({ "hop", QByteArray::number(tmp.getHop()).toStdString() });
                 rowRow.insert({ "hash", tmp.getHash().toStdString() });
-                rowRow.insert({ "approver", tmp.getApprover().toStdString() });
+                rowRow.insert({ "approver", tmp.getApprover().toActorId().toStdString() });
                 rowRow.insert({ "digSig", tmp.getDigSig().toStdString() });
-
+                if (tmp.getProducer() == 0)
+                    rowRow.insert({ "producer", "0" });
+                else
+                    rowRow.insert({ "producer", tmp.getProducer().toActorId().toStdString() });
                 DB.insert(Config::DataStorage::TxBlockTable, rowRow);
             }
             QByteArrayList listSign = block.getListSignatures();
-            for (int i = 0; i < listSign.size(); i += 2)
+            for (int i = 0; i < listSign.size(); i += 3)
             {
                 DBRow rowRow;
                 rowRow.insert({ "actorId", listSign[i].toStdString() });
                 rowRow.insert({ "digSig", listSign[i + 1].toStdString() });
+                rowRow.insert({ "type", listSign[i + 2].toStdString() });
                 DB.insert(Config::DataStorage::SignTable, rowRow);
             }
         }
@@ -579,7 +552,7 @@ int BlockIndex::removeById(const BigNumber &id)
     while (currentIdToRemove <= lastSavedId)
     {
         QString pathToFile = buildFilePath(currentIdToRemove);
-        qDebug() << "To remove: " << pathToFile;
+        qDebug() << "To remove:" << pathToFile;
         QFile file(pathToFile);
         if (file.exists() && !file.isOpen())
         {
@@ -599,7 +572,7 @@ int BlockIndex::removeById(const BigNumber &id)
 void BlockIndex::removeAll()
 {
     QString folderPath = this->getFolderPath();
-    qDebug() << "Clearing file index: " << folderPath;
+    qDebug() << "Clearing file index:" << folderPath;
 
     QDir folder(folderPath);
     for (const QString &section :
@@ -675,11 +648,12 @@ QByteArray BlockIndex::getById(const BigNumber &id) const
         QByteArray signes = "";
         for (const auto &tmp : rowsSign)
         {
-            QByteArray key, value;
+            QByteArray key, value, type;
             key = QByteArray(tmp.at("actorId").c_str());
             value = QByteArray(tmp.at("digSig").c_str());
-            QByteArray sign = Serialization::universalSerialize({ key, value }, 4);
-            signes += Serialization::universalSerialize({ sign }, 4);
+            type = QByteArray(tmp.at("type").c_str());
+            QByteArray sign = Serialization::serialize({ key, value, type }, 4);
+            signes += Serialization::serialize({ sign }, 4);
         }
         list << signes;
         b.initFields(list);
@@ -714,11 +688,12 @@ QByteArray BlockIndex::getById(const BigNumber &id) const
         QByteArray signes = "";
         for (const auto &tmp : rowsSign)
         {
-            QByteArray key, value;
+            QByteArray key, value, type;
             key = QByteArray(tmp.at("actorId").c_str());
             value = QByteArray(tmp.at("digSig").c_str());
-            QByteArray sign = Serialization::universalSerialize({ key, value }, 4);
-            signes += Serialization::universalSerialize({ sign }, 4);
+            type = QByteArray(tmp.at("type").c_str());
+            QByteArray sign = Serialization::serialize({ key, value, type }, 4);
+            signes += Serialization::serialize({ sign }, 4);
         }
         list << signes;
         b.initFields(list);
@@ -739,9 +714,10 @@ QByteArray BlockIndex::getById(const BigNumber &id) const
             QByteArray hash = tmp.at("hash").c_str();
             QByteArray approver = tmp.at("approver").c_str();
             QByteArray digSig = tmp.at("digSig").c_str();
+            QByteArray producer = tmp.at("producer").c_str();
             list << sender << receiver << amount << date << data << token << prevBlock << gas << hop << hash
-                 << approver << digSig;
-            b.addData(Serialization::universalSerialize(list, Serialization::TRANSACTION_FIELD_SIZE));
+                 << approver << digSig << producer;
+            b.addData(Serialization::serialize(list, Serialization::TRANSACTION_FIELD_SIZE));
         }
 
         return b.serialize();
@@ -775,13 +751,13 @@ BigNumber BlockIndex::loadFileFromSection(std::function<QString(const QStringLis
     QDir folder(getFolderPath());
 
     // sections
-    qDebug() << "FILE INDEX: "
-             << "loadFileFromSection(): " << folder.path();
+    qDebug() << "FILE INDEX:"
+             << "loadFileFromSection():" << folder.path();
     QStringList list = folder.entryList(QDir::Filter::Dirs | QDir::Filter::NoDotAndDotDot);
     if (list.isEmpty())
     {
-        qDebug() << "FILE INDEX: "
-                 << "loadFileFromSection(): "
+        qDebug() << "FILE INDEX:"
+                 << "loadFileFromSection():"
                  << "folder.entryList: empty";
         return BigNumber();
     }
@@ -789,20 +765,20 @@ BigNumber BlockIndex::loadFileFromSection(std::function<QString(const QStringLis
     folder.cd(getFolder(list)); // go to section
 
     // files in sections
-    qDebug() << "FILE INDEX: "
-             << "loadFileFromSection(): " << folder.path();
+    qDebug() << "FILE INDEX:"
+             << "loadFileFromSection():" << folder.path();
     list = folder.entryList(QDir::Filter::Files | QDir::Filter::NoDotAndDotDot);
     if (list.isEmpty())
     {
-        qDebug() << "FILE INDEX: "
-                 << "loadFileFromSection(): "
+        qDebug() << "FILE INDEX:"
+                 << "loadFileFromSection():"
                  << "folder.entryList->folder.entryList: empty";
         return BigNumber();
     }
     std::sort(list.begin(), list.end(), asBigNumComparator);
 
-    qDebug() << "FILE INDEX: "
-             << "loadFileFromSection(): lastId - "
+    qDebug() << "FILE INDEX:"
+             << "loadFileFromSection(): lastId -"
              << (list.isEmpty() ? BigNumber() : BigNumber(getFile(list).toLocal8Bit()));
     return list.isEmpty() ? BigNumber() : BigNumber(getFile(list).toLocal8Bit());
 }

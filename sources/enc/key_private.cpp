@@ -1,15 +1,20 @@
 #include "enc/key_private.h"
+
 KeyPrivate::KeyPrivate()
 {
     this->prkey = BigNumber();
     this->pbkey = EllipticPoint();
 }
-KeyPrivate::KeyPrivate(const QByteArray &keyPrivate)
-{
 
-    QList<QByteArray> list = Serialization::universalDeserialize(keyPrivate, 3);
-    this->prkey = BigNumber(list[0]);
-    this->pbkey = EllipticPoint(list[1]);
+KeyPrivate::KeyPrivate(const QJsonObject &json)
+{
+    BigNumber privateKey = json["privateKey"].toString().toLatin1();
+    auto publicKey = json["publicKey"].toObject();
+    BigNumber x = publicKey["x"].toString().toLatin1();
+    BigNumber y = publicKey["y"].toString().toLatin1();
+
+    this->prkey = privateKey;
+    this->pbkey = EllipticPoint(x, y);
 }
 
 KeyPrivate::KeyPrivate(const KeyPrivate &keyPrivate)
@@ -26,7 +31,7 @@ EllipticPoint KeyPrivate::generate()
 {
     try
     {
-        this->prkey = BigNumber::random(64, curve.p, false);
+        this->prkey = BigNumber::random(64, curve.p, false).nextPrime();
         this->pbkey = ECC::multiply(this->curve, this->prkey, curve.g);
         QByteArray s = this->sign("test");
         this->verify("test", s);
@@ -50,15 +55,15 @@ QByteArray KeyPrivate::encrypt(const QByteArray &data)
     {
         res.clear();
 
-        r = BigNumber::random(64, curve.p, false);
+        r = BigNumber::random(64, curve.p, false).nextPrime();
         R = ECC::multiply(secpCurve, r, secpCurve.g);
         S = ECC::multiply(secpCurve, r, this->pbkey);
-        res.append(blowFish_crypt().EncryptBlowFish(data, S.X().toByteArray() + S.Y().toByteArray()));
-        res.append(R.X().toByteArray());
-        res.append(R.Y().toByteArray());
-        result = Serialization::universalSerialize(res, Serialization::DEFAULT_FIELD_SIZE);
+        res.append(BlowFish::encrypt(data, S.x().toByteArray() + S.y().toByteArray()));
+        res.append(R.x().toByteArray());
+        res.append(R.y().toByteArray());
+        result = Serialization::serialize(res, Serialization::DEFAULT_FIELD_SIZE);
         res.clear();
-        res = Serialization::universalDeserialize(result, Serialization::DEFAULT_FIELD_SIZE);
+        res = Serialization::deserialize(result, Serialization::DEFAULT_FIELD_SIZE);
     } while (res.size() != 3);
     return result;
 }
@@ -67,8 +72,8 @@ QByteArray KeyPrivate::decrypt(const QByteArray &data)
 {
     ECC::curve secpCurve;
     QList<QByteArray> res;
-    res = Serialization::universalDeserialize(data, Serialization::DEFAULT_FIELD_SIZE);
-    qDebug() << res.size();
+    res = Serialization::deserialize(data, Serialization::DEFAULT_FIELD_SIZE);
+    // qDebug() << res.size();
     if (res.size() != 3)
     {
         qDebug() << "Wrong data \n Error in decrypt keyprivate.";
@@ -77,7 +82,17 @@ QByteArray KeyPrivate::decrypt(const QByteArray &data)
     QByteArray s = res.at(0);
     EllipticPoint R(res.at(1), res.at(2));
     EllipticPoint S2 = ECC::multiply(secpCurve, this->prkey, R);
-    return blowFish_crypt().DecryptBlowFish(s, S2.X().toByteArray() + S2.Y().toByteArray());
+    return BlowFish::decrypt(s, S2.x().toByteArray() + S2.y().toByteArray());
+}
+
+QByteArray KeyPrivate::encryptSymmetric(const QByteArray &data)
+{
+    return BlowFish::encrypt(data, this->prkey.toByteArray());
+}
+
+QByteArray KeyPrivate::decryptSymmetric(const QByteArray &data)
+{
+    return BlowFish::decrypt(data, this->prkey.toByteArray());
 }
 
 QByteArray KeyPrivate::sign(const QByteArray &data)
@@ -90,9 +105,9 @@ QByteArray KeyPrivate::sign(const QByteArray &data)
 
         while ((r == 0) || (s == 0))
         {
-            k = BigNumber::random(curve.n, false);
+            k = BigNumber::random(curve.n, false).nextPrime();
             point = ECC::multiply(curve, k, curve.g);
-            r = point.X() % curve.n;
+            r = point.x() % curve.n;
             s = ((hashMessage + r * this->prkey) * ECC::inverseMod(k, curve.n)) % curve.n;
         }
 
@@ -100,7 +115,7 @@ QByteArray KeyPrivate::sign(const QByteArray &data)
         list.append(r.toByteArray());
         list.append(s.toByteArray());
 
-        QByteArray dsignBase64 = Serialization::universalSerialize(list, 3);
+        QByteArray dsignBase64 = Serialization::serialize(list, 3);
         assert(verify(data, dsignBase64));
 
         return dsignBase64;
@@ -114,7 +129,7 @@ QByteArray KeyPrivate::sign(const QByteArray &data)
 bool KeyPrivate::verify(const QByteArray &data, const QByteArray &dsignBase64)
 {
     BigNumber z = BigNumber(Utils::calcKeccak(data));
-    QList<QByteArray> signature = Serialization::universalDeserialize(dsignBase64, 3);
+    QList<QByteArray> signature = Serialization::deserialize(dsignBase64, 3);
     BigNumber r(signature[0]), s(signature[1]);
     BigNumber w = ECC::inverseMod(s, curve.n);
     BigNumber u1 = (z * w) % curve.n;
@@ -123,29 +138,15 @@ bool KeyPrivate::verify(const QByteArray &data, const QByteArray &dsignBase64)
     assert(!pbkey.isZero());
     EllipticPoint p2 = ECC::multiply(curve, u2, pbkey);
     EllipticPoint point = ECC::add(curve, p1, p2);
-    return r % curve.n == point.X() % curve.n;
+    return r % curve.n == point.x() % curve.n;
 }
 
-QByteArray KeyPrivate::extractPublicKey()
-{
-    return this->pbkey.serialize();
-}
-QByteArray KeyPrivate::getPublicKey()
-{
-    return extractPublicKey();
-}
-
-QByteArray KeyPrivate::serialize()
-{
-    QList<QByteArray> list = { prkey.toByteArray(16), pbkey.serialize() };
-    return Serialization::universalSerialize(list, 3);
-}
-
-BigNumber KeyPrivate::extractPrivateKey()
+BigNumber KeyPrivate::getPrivateKey() const
 {
     return this->prkey;
 }
-BigNumber KeyPrivate::getPrivateKey()
+
+EllipticPoint KeyPrivate::getPublicKey() const
 {
-    return extractPrivateKey();
+    return pbkey;
 }

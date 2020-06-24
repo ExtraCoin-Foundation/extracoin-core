@@ -5,6 +5,8 @@
 #include <QDebug>
 #include <QFile>
 
+#include "dfs/types/headers/dfstruct.h"
+
 class Profile
 {
     Q_GADGET
@@ -19,7 +21,6 @@ class Profile
     Q_PROPERTY(qint16 birthYear READ birthYear WRITE setBirthYear)
     Q_PROPERTY(qint16 gender READ gender WRITE setGender)
     Q_PROPERTY(QStringList avatar READ avatar WRITE setAvatar)
-    Q_PROPERTY(QString miniAvatar READ miniAvatar WRITE setMiniAvatar)
     Q_PROPERTY(QString bio READ bio WRITE setBio)
     Q_PROPERTY(QString url READ url WRITE setUrl)
     Q_PROPERTY(QString urlName READ urlName WRITE setUrlName)
@@ -79,7 +80,6 @@ public:
     qint16 gender() const;
     QStringList avatar() const;
     qint16 country() const;
-    QString miniAvatar() const;
     QString bio() const;
     QString url() const;
     QString urlName() const;
@@ -117,7 +117,6 @@ public:
     void setGender(qint16 gender);
     void setAvatar(QStringList avatar);
     void setBio(const QString& bio);
-    void setMiniAvatar(const QString& miniAvatar);
     void setUrl(const QString& url);
     void setUrlName(const QString& urlName);
     void setCountry(qint16 country);

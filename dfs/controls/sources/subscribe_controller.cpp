@@ -18,17 +18,19 @@ void SubscribeController::editMySubscribe(QByteArray id, bool isRemove)
 {
     QByteArray currentId = nodeManager->getIdPrivateProfile();
     sendEditSql(currentId, "subscribe", DfsStruct::Type::Service,
-                isRemove ? DfsStruct::Delete : DfsStruct::Insert,
+                isRemove ? DfsStruct::ChangeType::Delete : DfsStruct::ChangeType::Insert,
                 { Config::DataStorage::subscribeColumnTableName.c_str(), "subscription", id });
 
     sendEditSql(
-        id, "follower", DfsStruct::Type::Service, isRemove ? DfsStruct::Delete : DfsStruct::Insert,
+        id, "follower", DfsStruct::Type::Service,
+        isRemove ? DfsStruct::ChangeType::Delete : DfsStruct::ChangeType::Insert,
         { Config::DataStorage::subscribeFollowerTableName.c_str(), "subscriber", currentId, "sign", "TODO" });
 }
 
 bool SubscribeController::checkSubscribe(QByteArray id)
 {
-    QByteArray path = "data/" + nodeManager->getIdPrivateProfile() + "/services/subscribe";
+    QString path =
+        DfsStruct::ROOT_FOOLDER_NAME + "/" + nodeManager->getIdPrivateProfile() + "/services/subscribe";
     DBConnector DB(path.toStdString());
     DB.createTable(Config::DataStorage::tableMySubscribeCreation);
     std::vector<DBRow> res = DB.select("SELECT * FROM " + Config::DataStorage::subscribeColumnTableName
@@ -38,18 +40,18 @@ bool SubscribeController::checkSubscribe(QByteArray id)
 
 int SubscribeController::checkCountSubscribe(QByteArray id)
 {
-    QByteArray path = "data/" + id + "/services/subscribe";
+    QString path = DfsStruct::ROOT_FOOLDER_NAME + "/" + id + "/services/subscribe";
     DBConnector DB(path.toStdString());
     DB.createTable(Config::DataStorage::tableMySubscribeCreation);
     std::vector<DBRow> res =
         DB.select("SELECT COUNT (*) FROM " + Config::DataStorage::subscribeColumnTableName);
-    int count = std::stoi(res[0]["COUNT (*)"]);
+    int count = res.empty() ? 0 : std::stoi(res[0]["COUNT (*)"]);
     return count;
 }
 
 std::vector<DBRow> SubscribeController::getAllSubscribe(QByteArray id)
 {
-    QByteArray path = "data/" + id + "/services/subscriber";
+    QString path = DfsStruct::ROOT_FOOLDER_NAME + "/" + id + "/services/subscriber";
     DBConnector DB(path.toStdString());
     DB.createTable(Config::DataStorage::tableMySubscribeCreation);
     std::vector<DBRow> res = DB.select("SELECT * FROM " + Config::DataStorage::subscribeColumnTableName);

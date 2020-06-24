@@ -30,7 +30,7 @@ public:
      * @brief Existing keys
      * @param keyPair - [prKey:pubKey]
      */
-    KeyPrivate(const QByteArray &keyPrivate);
+    KeyPrivate(const QJsonObject &json);
     KeyPrivate(const KeyPrivate &keyPrivate);
     ~KeyPrivate();
 
@@ -40,25 +40,16 @@ public:
 public: // Cryptor interface
     QByteArray encrypt(const QByteArray &data);
     QByteArray decrypt(const QByteArray &data);
+    QByteArray encryptSymmetric(const QByteArray &data);
+    QByteArray decryptSymmetric(const QByteArray &data);
 
 public: // Signer interface
     QByteArray sign(const QByteArray &data);
     bool verify(const QByteArray &data, const QByteArray &dsignBase64);
 
 public:
-    /**
-     * @brief extractPrivateKey
-     * @return
-     */
-    BigNumber extractPrivateKey();
-    /**
-     * @brief extractPublicKey
-     * @return
-     */
-    QByteArray extractPublicKey();
-    BigNumber getPrivateKey();
-    QByteArray getPublicKey();
-    QByteArray serialize();
+    BigNumber getPrivateKey() const;
+    EllipticPoint getPublicKey() const;
 };
 
 #endif // KEY_PRIVATE_H

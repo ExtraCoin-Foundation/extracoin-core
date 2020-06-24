@@ -1,4 +1,4 @@
-﻿#ifndef NODE_MANAGER_H
+#ifndef NODE_MANAGER_H
 #define NODE_MANAGER_H
 #ifndef RESOLVE_MANAGER_DEF
 #define RESOLVE_MANAGER_DEF
@@ -18,24 +18,24 @@ class ResolveManager;
 #include "managers/thread_pool.h"
 #include "dfs/controls/headers/dfs.h"
 #include "managers/contract_manager.h"
-#include "enc/crypt_manager.h"
 #include "managers/sm_manager.h"
 #include "dfs/managers/headers/dfsnetmanager.h"
 #include "managers/chatmanager.h"
 #include "profile/private_profile.h"
 #include "dfs/controls/headers/subscribe_controller.h"
 #include "headers/network/packages/service/message_types.h"
+#include "managers/file_updater_manager.h"
 
 #include "asyncfuture.h"
 #include <QtConcurrent>
 
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
 #include "ui/ui_controller.h"
 #include "headers/ui/notificationclient.h"
 #include "managers/notification_manager.h"
 #endif
 
-#ifdef EXTRACOIN_CONSOLE
+#ifdef EXTRACHAIN_CONSOLE
 #include "managers/console_manager.h"
 #endif
 
@@ -57,18 +57,17 @@ private:
     ResolveManager *resolveManager;
     SubscribeController *subscribeController;
     PrivateProfile *prProfile;
+    // ContractManager *contractManager;
 
     QByteArray idPrivateProfile;
     QByteArray hashLoginPrivateProfile;
 
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     UiController *uiController;
     WalletController *uiWallet;
     NotificationClient *notificationClient = nullptr;
     NotificationManager *notifyM;
 #endif
-    CryptManager *cryptManager;
-    //    ContractManager *contractManager;
 
 public:
     NodeManager();
@@ -97,13 +96,23 @@ public:
 
     Transaction createTransactionFrom(BigNumber sender, BigNumber receiver, BigNumber amount,
                                       BigNumber token = 0);
+    /**
+     * @brief createFreezeTransaction
+     * if receiver = 0 -> to me
+     * @param receiver
+     * @param amount
+     * @param token
+     * @return
+     */
+    Transaction createFreezeTransaction(BigNumber receiver, BigNumber amount, bool toFreeze,
+                                        BigNumber token = 0);
 
     int getClientList();
 
 public:
     void coinResponse(BigNumber receiver, BigNumber amount, BigNumber plsr);
 
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     UiController *getUiController() const;
     void setNotificationClient(NotificationClient *newNtfCl);
 #endif
@@ -113,8 +122,10 @@ public:
 
     ChatManager *getChatManager() const;
 
+    Dfs *getDfs() const;
+
 private:
-    Actor<KeyPrivate> CreateExtracoin();
+    Actor<KeyPrivate> CreateCompany(QByteArray consoleHash);
     void showMessage(QString from, QString message);
     /**
      * @brief Connect signals between NetManager and Blockchain
@@ -158,8 +169,11 @@ signals:
     void setCurrentIdNotifyM(const QByteArray id);
     void getAllActorsNode(QByteArray id, bool acc);
     void loadProfileForConsoleLogin(const QByteArray &login, const QByteArray &password);
+    void generateSmartContract(QByteArray tokenCount, QByteArray tokenName, QByteArray rulAddress,
+                               QByteArray color);
 
 private slots:
+    void initConsoleToken(Transaction tx);
     void getAllActors();
     void getAllActorsTimerCall();
     void setIdPrivateProfile(QByteArray id);
@@ -177,7 +191,7 @@ public slots:
     //    void makeFirstContractTransaction(Contract contract);
     void createNetManagerIdentificator();
     void dfscreateNetManagerIdentificator();
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     void sendTransactionFromUi(BigNumber reciever, BigNumber actor, BigNumber token);
 
 private slots:
@@ -188,14 +202,22 @@ private slots:
     void updateRecentActivities();
     void changeWalletIdUi(BigNumber walletId);
     void addNewWallet();
-
+    void notificationToken(QString os, QString actorId, QString token);
 #endif
 
-#ifdef EXTRACOIN_CONSOLE
+#ifdef EXTRACHAIN_CONSOLE
+signals:
+    void pushNotification(QString actorId, Notification notification);
+
 public: // TODO
+    ConsoleManager *consoleManager()
+    {
+        return m_consoleManager;
+    }
+
     void setConsoleManager(ConsoleManager *consoleManager)
     {
-        this->consoleManager = consoleManager;
+        this->m_consoleManager = consoleManager;
     }
 
     auto &requestCoinQueue()
@@ -221,7 +243,7 @@ public: // TODO
     }
 
 private:
-    ConsoleManager *consoleManager;
+    ConsoleManager *m_consoleManager;
     QList<std::tuple<BigNumber, BigNumber, BigNumber>> m_requestCoinQueue;
     bool m_listenCoinRequest = false;
 #endif

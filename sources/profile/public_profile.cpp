@@ -1,6 +1,6 @@
 #include "profile/public_profile.h"
 
-PublicProfile::PublicProfile(QByteArrayList _profile, QByteArray _sign, QByteArray path, QByteArray _id)
+PublicProfile::PublicProfile(QByteArrayList _profile, QByteArray _sign, QString path, QByteArray _id)
 {
     sign = _sign;
     id = _id;
@@ -14,7 +14,7 @@ PublicProfile::PublicProfile()
     id = "";
 }
 
-PublicProfile::PublicProfile(QByteArray _id, QByteArray _path)
+PublicProfile::PublicProfile(QByteArray _id, QString _path)
 {
     id = _id;
     idPath = _path + id + ".profile";
@@ -49,14 +49,14 @@ QByteArray PublicProfile::serialize() const
 {
     QFile profile(idPath);
     profile.open(QIODevice::ReadOnly);
-    QByteArray data = profile.readAll() + idPath + Utils::intToByteArray(idPath.size(), 4) + sign
+    QByteArray data = profile.readAll() + idPath.toLatin1() + Utils::intToByteArray(idPath.size(), 4) + sign
         + Utils::intToByteArray(sign.size(), 4) + id + Utils::intToByteArray(id.size(), 4);
     profile.flush();
     profile.close();
     return data;
 }
 
-void PublicProfile::setProfile(QByteArrayList profile, QByteArray path)
+void PublicProfile::setProfile(QByteArrayList profile, QString path)
 {
     idPath = path;
     QFile file(path);
@@ -67,47 +67,28 @@ void PublicProfile::setProfile(QByteArrayList profile, QByteArray path)
     file.write(newProfile + signWrite);
     file.flush();
     file.close();
-#ifdef EXTRACOIN_CLIENT
+
     if (newProfile.mid(0, 1) == "6")
     {
         QByteArrayList list = deserialize(newProfile);
         saveTokenNames(list.at(2), list.at(3), list.at(6));
     }
-#endif
-    return;
 }
 
 void PublicProfile::saveTokenNames(QByteArray id, QByteArray nameToken, QByteArray color)
 {
-    QFile file("blockchain/.tokens");
-    if (file.exists())
-    {
-        file.open(QIODevice::ReadOnly);
-        QByteArray dataFromFile = file.readAll();
-        QByteArrayList list = Serialization::universalDeserialize(dataFromFile, 4);
-        for (int i = 0; i < list.size(); i = i + 2)
-        {
-            if (id == list.at(i))
-            {
-                file.flush();
-                file.close();
-                return;
-            }
-        }
-        file.flush();
-        file.close();
-    }
-    file.open(QIODevice::WriteOnly | QIODevice::Append);
-    QByteArray data = Serialization::universalSerialize({ id, nameToken, color }, 4);
-
-    file.write(data);
-    file.flush();
-    file.close();
+    DBConnector db("blockchain/tokens.cache");
+    db.createTable(Config::DataStorage::tokensCacheTableCreate);
+    db.insert(Config::DataStorage::tokensCacheTable,
+              { { "tokenId", id.toStdString() },
+                { "name", nameToken.toStdString() },
+                { "color", color.toStdString() },
+                { "canStaking", "1" } }); // TODO
 }
 
 void PublicProfile::saveProfileFromNet(QByteArray newProfile)
 {
-    QDir().mkdir(ChatStorage::STORED_CHATS + id + "/profile/");
+    QDir().mkdir(DfsStruct::ROOT_FOOLDER_NAME + "/" + id + "/profile/");
     QFile profile(idPath);
     if (profile.exists())
     {
@@ -128,7 +109,7 @@ void PublicProfile::saveProfileFromNet(QByteArray newProfile)
     profile.write(newProfile);
     profile.flush();
     profile.close();
-#ifdef EXTRACOIN_CLIENT
+
     if (newProfile.mid(0, 1) == "6")
     {
         int signSize = Utils::qByteArrayToInt(newProfile.mid(newProfile.size() - 4, 4));
@@ -137,8 +118,6 @@ void PublicProfile::saveProfileFromNet(QByteArray newProfile)
         QByteArrayList list = deserialize(serializeData);
         saveTokenNames(list.at(2), list.at(3), list.at(6));
     }
-#endif
-    return;
 }
 
 QByteArrayList PublicProfile::getListProfile()
@@ -148,7 +127,7 @@ QByteArrayList PublicProfile::getListProfile()
     QFile profile(pathProfile);
     if (!profile.exists())
     {
-        qDebug() << "Profile isn't exist" << id;
+        // qDebug() << "Profile isn't exist" << id;
         return { QByteArrayList() };
     }
     profile.open(QIODevice::ReadOnly);

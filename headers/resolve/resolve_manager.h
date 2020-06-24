@@ -29,11 +29,11 @@ class ChatManager;
 #include "managers/tx_manager.h"
 #include "dfs/controls/headers/dfs.h"
 
-#ifdef EXTRACOIN_CONSOLE
+#ifdef EXTRACHAIN_CONSOLE
 static const short ResolverServicePoolMaxSize = 100;
 #endif
 
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
 static const short ResolverServicePoolMaxSize = 5;
 #endif
 

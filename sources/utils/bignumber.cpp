@@ -246,7 +246,6 @@ BigNumber BigNumber::operator-() const
 
 mpz_class BigNumber::data() const
 {
-
     return m_data;
 }
 
@@ -275,13 +274,23 @@ std::string BigNumber::toStdString(int base) const
     return m_data.get_str(base);
 }
 
+QByteArray BigNumber::toZeroByteArray(int size) const
+{
+    auto number = this->toByteArray();
+    if (size <= number.length())
+        return number;
+
+    auto zero = QByteArray().fill('0', size - number.length());
+    return zero + number;
+}
+
 QByteArray BigNumber::toActorId() const
 {
     QByteArray actorId = this->toByteArray();
+
     while (actorId.length() < 20)
-    {
         actorId.push_front('0');
-    }
+
     return actorId;
 }
 
@@ -319,6 +328,13 @@ void BigNumber::setInfinity(bool value)
         m_data = 0;
 }
 
+BigNumber BigNumber::nextPrime()
+{
+    mpz_class prime;
+    mpz_nextprime(prime.get_mpz_t(), m_data.get_mpz_t());
+    return prime;
+}
+
 bool BigNumber::isValid(const QByteArray &bigNumber, int base)
 {
     if (bigNumber.isEmpty())
@@ -343,7 +359,7 @@ BigNumber BigNumber::factorial(unsigned long number)
 BigNumber BigNumber::random(int n, bool zeroAllowed)
 {
     QByteArray str;
-    str.reserve(n);
+    str.resize(n);
     str[0] = '0';
 
     while (str[0] == '0')

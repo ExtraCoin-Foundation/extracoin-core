@@ -1,4 +1,4 @@
-﻿#include "network/network_manager.h"
+#include "network/network_manager.h"
 #include "resolve/resolve_manager.h"
 
 using namespace Messages;
@@ -26,7 +26,7 @@ void NetManager::addTempConnections(const QList<QByteArray> &value)
 NetManager::NetManager(AccountController *accountList, ActorIndex *actorIndex)
 {
     requestResponseMap = new QMap<QByteArray, int>();
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     QSettings settings;
 
     if (!settings.value("network/serverIp").isValid())
@@ -57,7 +57,7 @@ NetManager::NetManager(AccountController *accountList, ActorIndex *actorIndex)
         bool sub = local->ip().isInSubnet(QHostAddress::parseSubnet("192.168.0.0/16"));
         upnpDis = new UPNPConnection(*local);
         upnpNet = new UPNPConnection(*local);
-        qDebug() << "Sub: " << sub;
+        qDebug() << "Sub:" << sub;
         if (sub)
         {
 
@@ -70,9 +70,9 @@ NetManager::NetManager(AccountController *accountList, ActorIndex *actorIndex)
             //            SIGNAL(upnp_error(QString)), this,
             //            SLOT(upnpErrDis(QString))); qDebug() << "Tunnel creation
             //            started!"; upnpDis->makeTunnel(extPort, extPort, "UDP",
-            //                                "Discovery tunnel of ExtraCoin ");
+            //                                "Discovery tunnel of ExtraChain ");
             //            upnpNet->makeTunnel(netPort, netPort, "TCP",
-            //                                "Network tunnel of ExtraCoin ");
+            //                                "Network tunnel of ExtraChain ");
         }
         else
         {
@@ -180,7 +180,7 @@ void NetManager::findLocal()
         {
             if (address.ip().protocol() == QAbstractSocket::IPv4Protocol && address.ip() != localhost)
             {
-                qDebug() << "NET MANAGER: local ip: " << address.ip().toString() << " " << interface;
+                qDebug() << "NET MANAGER: Find local ip candidate:" << address.ip().toString() << interface;
                 localIpNotConnect.append(address.ip());
             }
         }
@@ -200,6 +200,7 @@ void NetManager::findLocal()
             if (!isRunning || !interface.isValid() || isLoopBack || isPointToPoint)
                 continue;
 
+#ifdef EXTRACHAIN_CONSOLE
             QTcpSocket *socket = new QTcpSocket;
             socket->bind(entry.ip());
             socket->connectToHost("8.8.8.8", 53);
@@ -207,15 +208,18 @@ void NetManager::findLocal()
             socket->deleteLater();
             if (!isConnected)
                 continue;
+#endif
 
             if (localIpNotConnect.contains(entry.ip()))
             {
-                local = new QNetworkAddressEntry(entry);
-                qDebug() << "Discovered local:" << local->ip().toString();
+                QString name = interface.name();
 
-                if (interface.name().left(2) == "wl" || interface.name().left(3) == "eth")
+                if (name.left(2) == "vm")
+                    continue;
+                if (name.left(2) == "wl" || name.left(3) == "eth" || name.left(2) == "en")
                 {
-                    qDebug() << "done";
+                    local = new QNetworkAddressEntry(entry);
+                    qDebug() << this << "Discovered local:" << local->ip().toString() << interface.name();
                     return;
                 }
             }
@@ -231,7 +235,7 @@ void NetManager::checkConnectionsStatus()
     emit qmlNetworkStatus(flag);
     emit qmlNetworkSockets(connections.length());
 
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     if (flag)
         sendFromCache();
 #endif
@@ -314,6 +318,8 @@ void NetManager::logDebug()
 
 void NetManager::reconnectUi()
 {
+    if (local != nullptr)
+        emit localIpFounded(local->ip().toString());
     connectToServer(serverPort, local);
 }
 
@@ -325,7 +331,7 @@ void NetManager::connectToServerByIpList(QList<QByteArray> ipList)
     QByteArray currentId;
     for (auto ip : ipList)
     {
-        idIpPair = Serialization::universalDeserialize(ip);
+        idIpPair = Serialization::deserialize(ip);
         currentId = (getConnectionByAddress(idIpPair[1])).getID().toByteArray();
         connectionIsActive = (getConnectionByAddress(idIpPair[1])).isActive();
 
@@ -345,7 +351,7 @@ void NetManager::connectToServerByIpList(QList<QByteArray> ipList)
 
 void NetManager::connectToServer(const quint16 &serverPort, QNetworkAddressEntry *local)
 {
-#ifdef EXTRACOIN_CONSOLE
+#ifdef EXTRACHAIN_CONSOLE
     return;
 #endif
     qDebug() << "void NetManager::connectToServer()";
@@ -384,7 +390,7 @@ void NetManager::setupServerServiceConnections()
 {
     connect(serverService, &ServerService::newConnection, this, &NetManager::addConnection,
             Qt::UniqueConnection);
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     connect(serverService, &ServerService::serverStatus, this, &NetManager::qmlServerError);
 #endif
 }
@@ -404,18 +410,27 @@ void NetManager::broadcastMsg(const QByteArray &msg)
 }
 
 void NetManager::sendMessage(const QByteArray &message, const unsigned int &msgType,
-                             const SocketPair &receiver)
+                             const SocketPair &receiver, Config::Net::TypeSend typeSend)
 {
     Config::Net::TypeSend send;
-    if (Messages::isChainMessage(msgType) || Messages::isGeneralRequest(msgType) || msgType == 400
-        || msgType == 402)
-        send = Config::Net::TypeSend::ALL;
-    else if (Messages::isGeneralResponse(msgType) || msgType == 401 || msgType == 403)
-        send = Config::Net::TypeSend::FOCUSED;
+
+    if (typeSend == Config::Net::TypeSend::Default)
+    {
+        if (Messages::isChainMessage(msgType) || Messages::isGeneralRequest(msgType) || msgType == 400
+            || msgType == 402)
+            send = Config::Net::TypeSend::All;
+        else if (Messages::isGeneralResponse(msgType) || msgType == 401 || msgType == 403)
+            send = Config::Net::TypeSend::Focused;
+        else
+            send = Config::Net::TypeSend::Except;
+    }
     else
-        send = Config::Net::TypeSend::EXCEPT;
-    if (connections.isEmpty())
-        saveToCache(message, msgType, receiver);
+    {
+        send = typeSend;
+    }
+
+    if (connections.isEmpty()) // TODO: write type send
+        saveToCache(message, msgType, receiver, send);
 
     for (const auto &tmp : connections)
     {
@@ -423,14 +438,16 @@ void NetManager::sendMessage(const QByteArray &message, const unsigned int &msgT
 
         switch (send)
         {
-        case Config::Net::TypeSend::EXCEPT:
+        case Config::Net::TypeSend::Except:
             isSend = tmp->getAddress().toStdString() != receiver.ip && tmp->getPort() != receiver.port;
             break;
-        case Config::Net::TypeSend::FOCUSED:
+        case Config::Net::TypeSend::Focused:
             isSend = tmp->getAddress().toStdString() == receiver.ip && tmp->getPort() == receiver.port;
             break;
-        case Config::Net::TypeSend::ALL:
+        case Config::Net::TypeSend::All:
             isSend = true;
+            break;
+        default:
             break;
         }
 
@@ -438,8 +455,8 @@ void NetManager::sendMessage(const QByteArray &message, const unsigned int &msgT
             continue;
         if (tmp->getActive())
             tmp->distMsg(message, receiver);
-        else
-            saveToCache(message, msgType, receiver);
+        // else
+        //     saveToCache(message, msgType, receiver, send);
     }
 
     //    if (checkMsgCount(message, handler, connections))
@@ -471,32 +488,36 @@ bool NetManager::checkMsgCount(const QByteArray &msg, QMap<QByteArray, int> &han
 }
 
 void NetManager::saveToCache(const QByteArray &message, const unsigned int &msgType,
-                             const SocketPair &receiver)
+                             const SocketPair &receiver, Config::Net::TypeSend typeSend)
 {
-    QFile file("network_cache");
+    QFile file("tmp/network.cache");
     file.open(QFile::Append);
-    QByteArrayList list = { message, QByteArray::fromStdString(receiver.ip),
-                            QByteArray::number(receiver.port), receiver.iden, QByteArray::number(msgType) };
-    QByteArray package = Serialization::universalSerialize(list, 8);
+    QByteArrayList list = { message,
+                            QByteArray::fromStdString(receiver.ip),
+                            QByteArray::number(receiver.port),
+                            receiver.iden,
+                            QByteArray::number(msgType),
+                            QByteArray::number(typeSend) };
+    QByteArray package = Serialization::serialize(list, 8);
     file.write(Utils::intToByteArray(package.length(), 8) + package);
     file.close();
 }
 
 void NetManager::sendFromCache()
 {
-    QFile file("network_cache");
+    QFile file("tmp/network.cache");
     if (!file.exists())
         return;
     if (!file.open(QFile::ReadOnly))
         return;
-    QByteArrayList allPackages = Serialization::universalDeserialize(file.readAll(), 8);
+    QByteArrayList allPackages = Serialization::deserialize(file.readAll(), 8);
     file.close();
     file.remove();
 
     for (QByteArray packageData : allPackages)
     {
-        QByteArrayList package = Serialization::universalDeserialize(packageData, 8);
-        if (package.length() != 5)
+        QByteArrayList package = Serialization::deserialize(packageData, 8);
+        if (package.length() != 6)
             return;
 
         QByteArray data = package[0];
@@ -504,13 +525,15 @@ void NetManager::sendFromCache()
         socketData.ip = package[1].toStdString();
         socketData.port = package[2].toShort();
         socketData.iden = package[3];
-        unsigned int type = package[4].toUInt();
-        sendMessage(data, type, socketData);
+        auto msgType = package[4].toUInt();
+        Config::Net::TypeSend typeSend = Config::Net::TypeSend(package[5].toInt());
+        sendMessage(data, msgType, socketData, typeSend);
     }
 }
+
 void NetManager::distMessage(const QByteArray &data, const SocketPair &socketData)
 {
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     bool flag = false;
     std::for_each(connections.begin(), connections.end(),
                   [&flag](SocketService *el) { flag = flag || el->getActive(); });
@@ -520,7 +543,7 @@ void NetManager::distMessage(const QByteArray &data, const SocketPair &socketDat
 #endif
         for (int i = 0; i < connections.size(); i++)
             connections[i]->distMsg(data, socketData);
-#ifdef EXTRACOIN_CLIENT
+#ifdef EXTRACHAIN_CLIENT
     }
     else
     {
@@ -528,7 +551,7 @@ void NetManager::distMessage(const QByteArray &data, const SocketPair &socketDat
         file.open(QFile::Append);
         QByteArrayList list = { data, QByteArray::fromStdString(socketData.ip),
                                 QByteArray::number(socketData.port), socketData.iden };
-        QByteArray package = Serialization::universalSerialize(list, 8);
+        QByteArray package = Serialization::serialize(list, 8);
         file.write(Utils::intToByteArray(package.length(), 8) + package);
         file.close();
     }
@@ -549,12 +572,12 @@ void *NetManager::MessageReceived(const QByteArray &msg, const SocketPair &recei
 
 void NetManager::upnpErrDis(QString msg)
 {
-    qCritical() << "NET MANAGER: UPnP Error: " << msg;
+    qCritical() << "NET MANAGER: UPnP Error:" << msg;
 }
 
 void NetManager::upnpErrNet(QString msg)
 {
-    qCritical() << "NET MANAGER: UPnP Error: " << msg;
+    qCritical() << "NET MANAGER: UPnP Error:" << msg;
 }
 
 SocketService *NetManager::addConnectionFromPair(QHostAddress address, quint16 port)
@@ -563,7 +586,8 @@ SocketService *NetManager::addConnectionFromPair(QHostAddress address, quint16 p
     socket->setNetManager(this);
     connections.append(socket);
     connectSocket();
-    qDebug() << "NET MANAGER: New connection is established : " << address << ":" << port;
+    qDebug().noquote().nospace() << "NET MANAGER: New connection is established: " << address.toString()
+                                 << ":" << port;
 
     ThreadPool::addThread(connections.last());
     //    connections.last()->process();
@@ -595,6 +619,16 @@ void NetManager::removeConnection()
     connections.removeAt(connections.indexOf(connection));
     connection->finished();
     checkConnectionsStatus();
+}
+
+void NetManager::send(const QByteArray &data, const unsigned int &msgType, const SocketPair &receiver,
+                      Config::Net::TypeSend typeSend)
+{
+    Messages::BaseMessage msg;
+    msg.type = msgType;
+    msg.data = data;
+    QByteArray message = msg.serialize();
+    sendMessage(message, msgType, receiver, typeSend);
 }
 
 void NetManager::signMessage(BaseMessage &message) const
@@ -658,9 +692,9 @@ QByteArray NetManager::getSerializedConnectionList() const
             continue;
 
         connectionsList.append(
-            Serialization::universalSerialize({ i->getID().toByteArray(), i->getAddress().toLocal8Bit() }));
+            Serialization::serialize({ i->getID().toByteArray(), i->getAddress().toLocal8Bit() }));
     }
-    return Serialization::universalSerialize(connectionsList);
+    return Serialization::serialize(connectionsList);
 }
 
 void NetManager::checkOnValidConnection(QByteArray id, QByteArray address)
@@ -668,7 +702,7 @@ void NetManager::checkOnValidConnection(QByteArray id, QByteArray address)
     QList<QByteArray> idAddressPair;
     for (auto i : tempConnections)
     {
-        idAddressPair = Serialization::universalDeserialize(i);
+        idAddressPair = Serialization::deserialize(i);
         if (idAddressPair.size() != 2)
         {
             qDebug() << "[Error][" << __LINE__ << "][" << __FILE__ << "]" << __FUNCTION__ << "] size!=2";

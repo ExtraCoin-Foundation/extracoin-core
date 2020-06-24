@@ -6,7 +6,8 @@ CardFile::CardFile(QString userId)
 {
     m_userId = userId;
     m_fileName = QString("%1/%2/%3").arg(DfsStruct::ROOT_FOOLDER_NAME, userId, DfsStruct::ACTOR_CARD_FILE);
-    m_lastCacheName = QString("%1/%2/root.last").arg(DfsStruct::ROOT_FOOLDER_NAME, userId);
+    m_lastCacheName =
+        QString("%1/%2/%3").arg(DfsStruct::ROOT_FOOLDER_NAME, userId, DfsStruct::ACTOR_CARD_LAST);
 }
 
 QString CardFile::userId() const
@@ -55,10 +56,21 @@ std::optional<DBRow> CardFile::last()
     return {};
 }
 
-bool CardFile::append(QString fileId, int type, QByteArray sign, bool isFilePath, int key)
+bool CardFile::append(QString fileId, int type, int version, QByteArray sign, bool isFilePath, int key)
 {
     if (isFilePath)
         fileId = CardManager::cutPath(fileId);
+
+    /*
+    if (type == 105 || type == 102)
+    {
+        int i = fileId.indexOf(".");
+        fileId = fileId.mid(i - 2, 2) + "/" + fileId;
+    }
+    */
+
+    QString filePath = QString::fromStdString(
+        CardManager::buildPathForFile(m_userId.toStdString(), fileId.toStdString(), DfsStruct::Type(type)));
 
     std::string prevId = "-";
     auto lastRes = last();
@@ -67,14 +79,17 @@ bool CardFile::append(QString fileId, int type, QByteArray sign, bool isFilePath
     {
         auto lastRes2 = *lastRes;
         prevId = lastRes2["id"];
+        if (key == 1)
+            key = std::stoi(lastRes2["key"]) + 1;
     }
 
     DBRow row;
-    row.insert({ "key", key == -1 ? "auto_max" : std::to_string(key) });
+    row.insert({ "key", std::to_string(key) });
     row.insert({ "id", fileId.toStdString() });
     row.insert({ "type", std::to_string(type) });
     row.insert({ "prevId", prevId });
     row.insert({ "nextId", "-" });
+    row.insert({ "version", std::to_string(version) });
     row.insert({ "sign", sign.toStdString() });
 
     QFile lastCacheFile(m_lastCacheName);
